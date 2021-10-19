@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
+import 'config/theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'itzbill',
+        theme: MainTheme().theme,
         home: FutureBuilder(
           future: _initialization,
           builder: (context, snapshot) {
