@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:itzbill/models/pool.dart';
+import 'package:itzbill/screens/pool_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'providers/auth_provider.dart';
@@ -53,7 +55,8 @@ class AuthManager extends StatelessWidget {
         Provider.of<AuthProvider>(context, listen: true);
 
     if (authProvider.isAuthenticated) {
-      return HomeScreen();
+      return PoolScreen(currency: Currency.Soles);
+      //return HomeScreen();
     } else {
       return AuthScreen();
     }

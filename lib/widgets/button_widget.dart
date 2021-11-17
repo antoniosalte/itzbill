@@ -14,7 +14,7 @@ class ButtonWidget extends StatelessWidget {
         height: 50,
         child: ElevatedButton(
           child: Text(this.text!, style: TextStyle(fontSize: 20.0)),
-          onPressed: onPressed!,
+          onPressed: onPressed,
         ),
       ),
     );

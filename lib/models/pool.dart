@@ -2,6 +2,8 @@ import 'bill.dart';
 import 'expense.dart';
 import 'rate.dart';
 
+enum Currency { Soles, Dollars }
+
 class Pool {
   String id;
   String userId;
