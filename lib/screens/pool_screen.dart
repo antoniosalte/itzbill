@@ -20,6 +20,8 @@ import 'package:itzbill/widgets/loading_widget.dart';
 import 'package:itzbill/widgets/toast_widget.dart';
 import 'package:itzbill/widgets/button_widget.dart';
 
+import 'dart:js' as js;
+
 class PoolScreen extends StatefulWidget {
   PoolScreen({Key? key, required this.currency, this.pool}) : super(key: key);
 
@@ -38,7 +40,8 @@ class PoolScreenState extends State<PoolScreen> {
   Pool? pool;
   List<Bill> bills = [];
 
-  //TODO: Value to receive total, tcea xir?
+  double valueReceivedTotal = 0.0;
+  double tcea = 0.0;
 
   bool loading = false;
   bool locked = false;
@@ -236,7 +239,7 @@ class PoolScreenState extends State<PoolScreen> {
     Rate rate = pool!.rate;
     rateType = rate.type;
     daysPerYear = rate.daysPerYear.toString();
-    rateValue = (rate.value * 100).toString();
+    rateValue = (rate.value * 100).toStringAsFixed(7);
     rateValueController.text = rateValue!;
     rateTerm = rateMap.keys.firstWhere((k) => rateMap[k] == rate.termDays);
     rateTermDays = rate.termDays;
@@ -251,11 +254,14 @@ class PoolScreenState extends State<PoolScreen> {
     finalExpenses = pool!.finalExpenses;
 
     List<Bill> loadedBills = await _databaseService.loadBills(pool!.id);
+    for (Bill bill in loadedBills) {
+      valueReceivedTotal += bill.valueReceived;
+    }
     bills = loadedBills;
-
     setState(() {
       locked = true;
     });
+    _calculateXIRR();
   }
 
   Future<void> _addBill() async {
@@ -302,14 +308,11 @@ class PoolScreenState extends State<PoolScreen> {
         rateType == "Nominal" ? rateCapitalizationDays : -1,
       );
 
-      Rate tcea = rate;
-
       try {
         pool = await _databaseService.createPool(
           auth!.uid,
           discountDate!,
           rate,
-          tcea,
           widget.currency,
           initialExpenses,
           finalExpenses,
@@ -344,14 +347,23 @@ class PoolScreenState extends State<PoolScreen> {
         pool!.tea,
       );
 
-      _stopLoading();
-      _showToast('Letra agregada con éxito');
       setState(() {
         bills.add(bill);
+        valueReceivedTotal += bill.valueReceived;
       });
+
+      _calculateXIRR();
+      await _databaseService.updatePool(pool!.id, tcea, valueReceivedTotal);
+
+      _stopLoading();
+      _showToast('Letra agregada con éxito');
     } on Error catch (e) {
       _stopLoading();
       _showToast('Error al agregar: $e', true);
+    }
+
+    try {} on Error catch (e) {
+      print(e.toString());
     }
   }
 
@@ -362,17 +374,46 @@ class PoolScreenState extends State<PoolScreen> {
 
     try {
       await _databaseService.deleteBill(bill.id);
-      _stopLoading();
       setState(() {
-        //valueToReceiveTotal -= bill.valueToReceive;
+        valueReceivedTotal -= bill.valueReceived;
         bills.remove(bill);
       });
+
+      _calculateXIRR();
+      await _databaseService.updatePool(pool!.id, tcea, valueReceivedTotal);
+
+      _stopLoading();
       _showToast("Eliminado con exito");
       //calculateXIRR();
     } on Error catch (e) {
       _stopLoading();
       _showToast('Error al eliminar: $e', true);
     }
+  }
+
+  void _calculateXIRR() {
+    js.JsArray dates = new js.JsArray();
+    js.JsArray amounts = new js.JsArray();
+
+    double sum = 0.0;
+    for (Bill bill in bills) {
+      DateTime dateTime = bill.dueDate;
+      String date = "${dateTime.year}/${dateTime.month}/${dateTime.day}";
+      amounts.add((-bill.valueDelivered).toString());
+      sum += -bill.valueDelivered;
+      dates.add(date);
+    }
+
+    DateTime a = pool!.discountDate;
+
+    amounts.add(valueReceivedTotal);
+    dates.add("${a.year}/${a.month}/${a.day}");
+
+    js.context.callMethod('alertMessage', [dates, amounts]);
+    var state = js.JsObject.fromBrowserObject(js.context['state']);
+    setState(() {
+      tcea = state['xirr'];
+    });
   }
 
   @override
@@ -1363,10 +1404,30 @@ class PoolScreenState extends State<PoolScreen> {
                       ),
                     ),
                   ),
+                  SizedBox(height: 32.0),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 32.0),
+                    width: double.infinity,
+                    child: Text(
+                      "Valor a Recibir Total: ${valueReceivedTotal.toStringAsFixed(2)}",
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+                  SizedBox(height: 16.0),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 32.0),
+                    width: double.infinity,
+                    child: Text(
+                      "TCEA Cartera: ${(tcea * 100).toStringAsFixed(2)}",
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+                  SizedBox(height: 16.0),
                 ],
               ),
             ),
           ),
+          SizedBox(height: 32.0),
         ],
       )),
     );

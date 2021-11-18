@@ -38,7 +38,6 @@ class DatabaseService {
 
       Rate rate = Rate.fromMap(data['rate']);
       Rate tea = Rate.fromMap(data['tea']);
-      Rate tcea = Rate.fromMap(data['tcea']);
 
       Pool pool = Pool.fromFirestore(
         data['id'],
@@ -46,7 +45,8 @@ class DatabaseService {
         data['discountDate'].toDate(),
         rate,
         tea,
-        tcea,
+        data['tcea'],
+        data['receivedTotal'],
         data['currency'],
         initialExpenses,
         finalExpenses,
@@ -62,7 +62,6 @@ class DatabaseService {
     String userId,
     DateTime discountDate,
     Rate rate,
-    Rate tcea,
     String currency,
     List<Expense> initialExpenses,
     List<Expense> finalExpenses,
@@ -82,6 +81,14 @@ class DatabaseService {
     await documentReference.set(pool.toFirestore());
 
     return pool;
+  }
+
+  Future<void> updatePool(
+      String poolId, double tcea, double receivedTotal) async {
+    await _firestore.collection('pool').doc(poolId).update({
+      'tcea': tcea,
+      'receivedTotal': receivedTotal,
+    });
   }
 
   Future<List<Bill>> loadBills(String poolId) async {

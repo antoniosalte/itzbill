@@ -7,7 +7,8 @@ class Pool {
   DateTime discountDate;
   Rate rate;
   Rate tea;
-  Rate tcea;
+  double tcea;
+  double receivedTotal;
   String currency;
   List<Expense> initialExpenses;
   List<Expense> finalExpenses;
@@ -19,30 +20,11 @@ class Pool {
     required this.rate,
     required this.tea,
     required this.tcea,
+    required this.receivedTotal,
     required this.currency,
     required this.initialExpenses,
     required this.finalExpenses,
   });
-
-  factory Pool.createToMenu(
-    DateTime discountDate,
-    Rate rate,
-    String currency,
-    List<Expense> initialExpenses,
-    List<Expense> finalExpenses,
-  ) {
-    return Pool(
-      id: "",
-      userId: "",
-      discountDate: discountDate,
-      rate: rate,
-      tea: rate,
-      tcea: rate,
-      currency: currency,
-      initialExpenses: initialExpenses,
-      finalExpenses: finalExpenses,
-    );
-  }
 
   factory Pool.createToFirestore(
     String id,
@@ -54,7 +36,6 @@ class Pool {
     List<Expense> finalExpenses,
   ) {
     Rate tea = Rate.toTEA(rate);
-    Rate tcea = tea; // TODO: Change this
 
     return Pool(
       id: id,
@@ -62,7 +43,8 @@ class Pool {
       discountDate: discountDate,
       rate: rate,
       tea: tea,
-      tcea: tcea,
+      tcea: 0.0,
+      receivedTotal: 0.0,
       currency: currency,
       initialExpenses: initialExpenses,
       finalExpenses: finalExpenses,
@@ -75,7 +57,8 @@ class Pool {
     DateTime discountDate,
     Rate rate,
     Rate tea,
-    Rate tcea,
+    double tcea,
+    double receivedTotal,
     String currency,
     List<Expense> initialExpenses,
     List<Expense> finalExpenses,
@@ -87,6 +70,7 @@ class Pool {
       rate: rate,
       tea: tea,
       tcea: tcea,
+      receivedTotal: receivedTotal,
       currency: currency,
       initialExpenses: initialExpenses,
       finalExpenses: finalExpenses,
@@ -110,7 +94,7 @@ class Pool {
       'discountDate': discountDate,
       'rate': rate.toFirestore(),
       'tea': tea.toFirestore(),
-      'tcea': tcea.toFirestore(),
+      'tcea': tcea,
       'currency': currency,
       'initialExpenses': initialExpensesMap,
       'finalExpenses': finalExpensesMap,

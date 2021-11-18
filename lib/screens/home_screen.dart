@@ -208,6 +208,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(e.currency),
                         Text(e.rate.type),
                         Text(e.rate.value.toString()),
+                        Text(e.tcea.toString()),
+                        Text(e.receivedTotal.toString()),
                       ],
                     ),
                   ),
