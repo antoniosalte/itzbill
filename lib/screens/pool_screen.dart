@@ -402,6 +402,12 @@ class PoolScreenState extends State<PoolScreen> {
         toolbarHeight: 80.0,
         //title: LogoWidget(fontSize: 48, alternative: true),
         backgroundColor: Theme.of(context).colorScheme.primary,
+        leadingWidth: 100,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new),
+          color: Theme.of(context).colorScheme.onSecondary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         actions: [
           HeaderButton(
             title: 'Logout',
