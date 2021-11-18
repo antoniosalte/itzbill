@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:itzbill/models/rate.dart';
 import 'package:provider/provider.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:itzbill/providers/auth_provider.dart';
+import 'package:itzbill/services/database_service.dart';
 import 'package:itzbill/models/pool.dart';
 import 'package:itzbill/models/expense.dart';
 import 'package:itzbill/models/bill.dart';
@@ -21,33 +23,41 @@ import 'package:itzbill/widgets/button_widget.dart';
 class PoolScreen extends StatefulWidget {
   PoolScreen({Key? key, required this.currency, this.pool}) : super(key: key);
 
-  final Currency currency;
-  final Pool? pool;
+  final String currency;
+  Pool? pool;
 
   @override
   PoolScreenState createState() => PoolScreenState();
 }
 
 class PoolScreenState extends State<PoolScreen> {
+  DatabaseService _databaseService = DatabaseService();
   FToast fToast = FToast();
   AuthProvider? auth;
+
+  Pool? pool;
+  List<Bill> bills = [];
+
+  //TODO: Value to receive total, tcea xir?
 
   bool loading = false;
   bool locked = false;
 
   String daysPerYear = "360";
   String rateTerm = "Anual";
-  String rateType = "Nominal";
+  String rateType = "Efectiva";
   String rateCapitalization = "Diario";
   String? rateValue;
   String? nominalValue;
   String? retentionValue;
 
+  TextEditingController rateValueController = TextEditingController();
+
   int rateTermDays = 360;
   int rateCapitalizationDays = 1;
 
   DateTime? discountDate;
-  DateTime? billDate;
+  DateTime? turnDate;
   DateTime? dueDate;
 
   String initialReason = "Portes";
@@ -57,9 +67,6 @@ class PoolScreenState extends State<PoolScreen> {
   String finalReason = "Portes";
   String finalValueType = "En Efectivo";
   String? finalValue;
-
-  double initialTotal = 0.0;
-  double finalTotal = 0.0;
 
   List<Expense> initialExpenses = [];
   List<Expense> finalExpenses = [];
@@ -147,18 +154,18 @@ class PoolScreenState extends State<PoolScreen> {
     }
   }
 
-  Future pickBillDate() async {
+  Future pickTurnDate() async {
     final initialDate = DateTime.now();
     final newDate = await showDatePicker(
       context: context,
-      initialDate: billDate ?? initialDate,
+      initialDate: turnDate ?? initialDate,
       firstDate: DateTime(DateTime.now().year - 5),
       lastDate: DateTime(DateTime.now().year + 5),
     );
 
     if (newDate == null) return;
 
-    setState(() => billDate = newDate);
+    setState(() => turnDate = newDate);
   }
 
   Future pickDueDate() async {
@@ -225,7 +232,33 @@ class PoolScreenState extends State<PoolScreen> {
     }
   }
 
-  Future<void> addBill() async {
+  Future<void> _loadPool() async {
+    Rate rate = pool!.rate;
+    rateType = rate.type;
+    daysPerYear = rate.daysPerYear.toString();
+    rateValue = (rate.value * 100).toString();
+    rateValueController.text = rateValue!;
+    rateTerm = rateMap.keys.firstWhere((k) => rateMap[k] == rate.termDays);
+    rateTermDays = rate.termDays;
+    if (rate.type == "Nominal") {
+      rateCapitalization =
+          rateMap.keys.firstWhere((k) => rateMap[k] == rate.capitalizationDays);
+      rateCapitalizationDays = rate.capitalizationDays;
+    }
+    discountDate = pool!.discountDate;
+
+    initialExpenses = pool!.initialExpenses;
+    finalExpenses = pool!.finalExpenses;
+
+    List<Bill> loadedBills = await _databaseService.loadBills(pool!.id);
+    bills = loadedBills;
+
+    setState(() {
+      locked = true;
+    });
+  }
+
+  Future<void> _addBill() async {
     if (loading) return;
 
     _startLoading();
@@ -242,7 +275,7 @@ class PoolScreenState extends State<PoolScreen> {
       return;
     }
 
-    if (billDate == null || billDate == '') {
+    if (turnDate == null || turnDate == '') {
       _stopLoading();
       _showToast('Seleccione una "Fecha de Giro"', true);
       return;
@@ -260,57 +293,86 @@ class PoolScreenState extends State<PoolScreen> {
       return;
     }
 
-    setState(() {
-      locked = true;
-    });
+    if (!locked) {
+      Rate rate = Rate.toPool(
+        rateType,
+        double.parse(rateValue!) / 100,
+        int.parse(daysPerYear),
+        rateTermDays,
+        rateType == "Nominal" ? rateCapitalizationDays : -1,
+      );
 
-    double realNominalValue = double.parse(nominalValue!);
+      Rate tcea = rate;
 
-    for (Expense expense in initialExpenses) {
-      double realValue = expense.value;
-      if (expense.valueType == "En Porcentaje") {
-        realValue = realNominalValue * expense.value / 100;
+      try {
+        pool = await _databaseService.createPool(
+          auth!.uid,
+          discountDate!,
+          rate,
+          tcea,
+          widget.currency,
+          initialExpenses,
+          finalExpenses,
+        );
+
+        _showToast('Cartera de Letras creada');
+        setState(() {
+          locked = true;
+        });
+      } on Error catch (e) {
+        _stopLoading();
+        _showToast('Error al agregar cartera de letras: $e', true);
       }
-      initialTotal += realValue;
     }
 
-    for (Expense expense in finalExpenses) {
-      double realValue = expense.value;
-      if (expense.valueType == "En Porcentaje") {
-        realValue = realNominalValue * expense.value / 100;
+    try {
+      double retention = 0.0;
+      if (retentionValue != null && retentionValue != '') {
+        retention = double.parse(retentionValue!);
       }
-      finalTotal += realValue;
+
+      Bill bill = await _databaseService.createBill(
+        pool!.id,
+        pool!.userId,
+        pool!.discountDate,
+        turnDate!,
+        dueDate!,
+        double.parse(nominalValue!),
+        retention,
+        initialExpenses,
+        finalExpenses,
+        pool!.tea,
+      );
+
+      _stopLoading();
+      _showToast('Letra agregada con éxito');
+      setState(() {
+        bills.add(bill);
+      });
+    } on Error catch (e) {
+      _stopLoading();
+      _showToast('Error al agregar: $e', true);
     }
+  }
 
-    // try {
-    //   Bill bill = await _databaseService.createBill(
-    //     auth!.uid,
-    //     discountDate!,
-    //     dueDate!,
-    //     billDate!,
-    //     double.parse(nominalValue!),
-    //     initialTotal,
-    //     finalTotal,
-    //     initialExpenses,
-    //     finalExpenses,
-    //     settings.rateType,
-    //     rateTerm,
-    //     double.parse(rateValue!) / 100,
-    //     rateDays,
-    //     int.parse(daysPerYear),
-    //   );
+  Future<void> _deleteBill(Bill bill) async {
+    if (loading) return;
 
-    //   _stopLoading();
-    //   setState(() {
-    //     bills.add(bill);
-    //     valueToReceiveTotal += bill.valueToReceive;
-    //     _showToast('Agregado con exito');
-    //   });
-    //   calculateXIRR();
-    // } on Error catch (e) {
-    //   _stopLoading();
-    //   _showToast('Error al agregar: $e', true);
-    // }
+    _startLoading();
+
+    try {
+      await _databaseService.deleteBill(bill.id);
+      _stopLoading();
+      setState(() {
+        //valueToReceiveTotal -= bill.valueToReceive;
+        bills.remove(bill);
+      });
+      _showToast("Eliminado con exito");
+      //calculateXIRR();
+    } on Error catch (e) {
+      _stopLoading();
+      _showToast('Error al eliminar: $e', true);
+    }
   }
 
   @override
@@ -319,6 +381,10 @@ class PoolScreenState extends State<PoolScreen> {
     loading = false;
     auth = Provider.of<AuthProvider>(context, listen: false);
     fToast.init(context);
+    pool = widget.pool;
+    if (pool != null) {
+      _loadPool();
+    }
   }
 
   @override
@@ -539,6 +605,7 @@ class PoolScreenState extends State<PoolScreen> {
                                   Flexible(
                                     child: TextField(
                                       enabled: !locked,
+                                      controller: rateValueController,
                                       keyboardType:
                                           TextInputType.numberWithOptions(
                                         decimal: true,
@@ -646,10 +713,10 @@ class PoolScreenState extends State<PoolScreen> {
                                 child: Center(
                                   child: TextButton(
                                     child: Text(
-                                      getDateText(billDate),
+                                      getDateText(turnDate),
                                       style: TextStyle(color: Colors.black),
                                     ),
-                                    onPressed: () => pickBillDate(),
+                                    onPressed: () => pickTurnDate(),
                                   ),
                                 ),
                               ),
@@ -926,6 +993,9 @@ class PoolScreenState extends State<PoolScreen> {
                                 if (initialReason != '') {
                                   setState(() {
                                     double value = double.parse(initialValue!);
+                                    if (initialValueType == "En Porcentaje") {
+                                      value /= 100;
+                                    }
                                     initialExpenses.add(
                                       Expense.fromMenu(
                                         "Initial",
@@ -960,7 +1030,7 @@ class PoolScreenState extends State<PoolScreen> {
                               int index = initialExpenses.indexOf(e);
                               String value = e.valueType == "En Efectivo"
                                   ? "${e.value}"
-                                  : "${e.value} %";
+                                  : "${e.value * 100} %";
                               return DataRow(cells: [
                                 DataCell(Text((index + 1).toString())),
                                 DataCell(Text(e.reason)),
@@ -1152,13 +1222,12 @@ class PoolScreenState extends State<PoolScreen> {
                                 if (finalReason != '') {
                                   setState(() {
                                     double value = double.parse(finalValue!);
+                                    if (finalValueType == "En Porcentaje") {
+                                      value /= 100;
+                                    }
                                     finalExpenses.add(
-                                      Expense.fromMenu(
-                                        "Final",
-                                        finalReason,
-                                        finalValueType,
-                                        value,
-                                      ),
+                                      Expense.fromMenu("Final", finalReason,
+                                          finalValueType, value),
                                     );
                                     finalReasons.remove(finalReason);
                                     finalReason = finalReasons.length > 0
@@ -1186,7 +1255,7 @@ class PoolScreenState extends State<PoolScreen> {
                               int index = finalExpenses.indexOf(e);
                               String value = e.valueType == "En Efectivo"
                                   ? "${e.value}"
-                                  : "${e.value} %";
+                                  : "${e.value * 100} %";
                               return DataRow(cells: [
                                 DataCell(Text((index + 1).toString())),
                                 DataCell(Text(e.reason)),
@@ -1230,7 +1299,62 @@ class PoolScreenState extends State<PoolScreen> {
                     padding: EdgeInsets.symmetric(horizontal: 32.0),
                     child: ButtonWidget(
                       text: 'Agregar',
-                      onPressed: addBill,
+                      onPressed: _addBill,
+                    ),
+                  ),
+                  SizedBox(height: 32.0),
+                  Container(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: DataTable(
+                        columns: [
+                          DataColumn(label: Text('N')),
+                          DataColumn(label: Text('Fecha Giro')),
+                          DataColumn(label: Text('Val. Nominal')),
+                          DataColumn(label: Text('Fecha Ven.')),
+                          DataColumn(label: Text('Dias')),
+                          DataColumn(label: Text('Retencion')),
+                          DataColumn(label: Text('TEP (i`)')),
+                          DataColumn(label: Text('d %')),
+                          DataColumn(label: Text('Descuento')),
+                          DataColumn(label: Text('Costes Ini.')),
+                          DataColumn(label: Text('Costes Fin.')),
+                          DataColumn(label: Text('Val. Neto')),
+                          DataColumn(label: Text('Val. Rec.')),
+                          DataColumn(label: Text('Val. Emt.')),
+                          DataColumn(label: Text('TCEA %')),
+                          DataColumn(label: Text('Acciones')),
+                        ],
+                        rows: bills.map((e) {
+                          int index = bills.indexOf(e);
+                          return DataRow(cells: [
+                            DataCell(Text((index + 1).toString())),
+                            DataCell(Text(getDateText(e.turnDate))),
+                            DataCell(Text(e.nominalValue.toStringAsFixed(2))),
+                            DataCell(Text(getDateText(e.dueDate))),
+                            DataCell(Text(e.days.toString())),
+                            DataCell(Text(e.retention.toStringAsFixed(2))),
+                            DataCell(Text(
+                                "${(e.interestRate * 100).toStringAsFixed(7)}%")),
+                            DataCell(Text(
+                                "${(e.discountRate * 100).toStringAsFixed(7)}%")),
+                            DataCell(Text(e.discount.toStringAsFixed(2))),
+                            DataCell(Text(e.initialTotal.toStringAsFixed(2))),
+                            DataCell(Text(e.finalTotal.toStringAsFixed(2))),
+                            DataCell(Text(e.netWorth.toStringAsFixed(2))),
+                            DataCell(Text(e.valueReceived.toStringAsFixed(2))),
+                            DataCell(Text(e.valueDelivered.toStringAsFixed(2))),
+                            DataCell(
+                                Text("${(e.tcea * 100).toStringAsFixed(7)}%")),
+                            DataCell(
+                              IconButton(
+                                icon: Icon(Icons.delete),
+                                onPressed: () => _deleteBill(e),
+                              ),
+                            ),
+                          ]);
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ],

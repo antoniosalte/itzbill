@@ -55,8 +55,8 @@ class AuthManager extends StatelessWidget {
         Provider.of<AuthProvider>(context, listen: true);
 
     if (authProvider.isAuthenticated) {
-      return PoolScreen(currency: Currency.Soles);
-      //return HomeScreen();
+      //return PoolScreen(currency: "Soles");
+      return HomeScreen();
     } else {
       return AuthScreen();
     }

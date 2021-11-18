@@ -8,6 +8,8 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:itzbill/providers/auth_provider.dart';
+import 'package:itzbill/services/database_service.dart';
+
 import 'package:itzbill/widgets/header_button_widget.dart';
 import 'package:itzbill/widgets/toast_widget.dart';
 import 'package:itzbill/widgets/loading_widget.dart';
@@ -20,12 +22,23 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  DatabaseService _databaseService = DatabaseService();
   FToast fToast = FToast();
   AuthProvider? auth;
 
   bool loading = false;
 
-  Currency _currency = Currency.Soles;
+  String currency = "Soles";
+
+  List<Pool> pools = [];
+
+  void _loadPool(Pool pool) async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => PoolScreen(currency: currency, pool: pool)),
+    );
+  }
 
   Future<void> _createPool() async {
     bool create = await showDialog(
@@ -41,24 +54,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     ListTile(
                       title: const Text('Soles'),
-                      leading: Radio<Currency>(
-                        value: Currency.Soles,
-                        groupValue: _currency,
-                        onChanged: (Currency? value) {
+                      leading: Radio<String>(
+                        value: "Soles",
+                        groupValue: currency,
+                        onChanged: (String? value) {
                           setState(() {
-                            _currency = value!;
+                            currency = value!;
                           });
                         },
                       ),
                     ),
                     ListTile(
                       title: const Text('Dolares'),
-                      leading: Radio<Currency>(
-                        value: Currency.Dollars,
-                        groupValue: _currency,
-                        onChanged: (Currency? value) {
+                      leading: Radio<String>(
+                        value: "Dolares",
+                        groupValue: currency,
+                        onChanged: (String? value) {
                           setState(() {
-                            _currency = value!;
+                            currency = value!;
                           });
                         },
                       ),
@@ -85,8 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (create) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-            builder: (context) => PoolScreen(currency: _currency)),
+        MaterialPageRoute(builder: (context) => PoolScreen(currency: currency)),
       );
     }
   }
@@ -135,12 +147,28 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> loadPools() async {
+    try {
+      List<Pool> loadedPools = await _databaseService.loadPools(auth!.uid);
+      _stopLoading();
+      setState(() {
+        pools = loadedPools;
+      });
+      _showToast('Cargado con exito');
+    } on Error catch (e) {
+      print(e.toString());
+      _stopLoading();
+      _showToast('Error al cargar, actualice la pagina', true);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    loading = false;
+    loading = true;
     auth = Provider.of<AuthProvider>(context, listen: false);
     fToast.init(context);
+    loadPools();
   }
 
   @override
@@ -167,18 +195,25 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.all(64.0),
         child: Column(
           children: [
-            InkWell(
-              onTap: () {},
-              child: Card(
-                child: Container(
-                  height: 100,
-                  width: double.infinity,
-                  child: Column(
-                    children: [],
+            ...pools.map((e) {
+              return InkWell(
+                onTap: () => _loadPool(e),
+                child: Card(
+                  child: Container(
+                    height: 100,
+                    width: double.infinity,
+                    child: Column(
+                      children: [
+                        Text(e.id),
+                        Text(e.currency),
+                        Text(e.rate.type),
+                        Text(e.rate.value.toString()),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            }).toList(),
             ButtonWidget(text: 'Crear nueva cartera', onPressed: _createPool),
           ],
         ),
