@@ -2,10 +2,6 @@ import 'dart:math';
 import 'expense.dart';
 import 'rate.dart';
 
-// extension Ex on double {
-//   double toPrecision(int n) => double.parse(toStringAsFixed(n));
-// }
-
 class Bill {
   String id;
   String poolId;
@@ -58,8 +54,8 @@ class Bill {
     List<Expense> finalExpenses,
     Rate tea,
   ) {
-    nominalValue = nominalValue; //.toPrecision(7);
-    retention = retention; //.toPrecision(7);
+    nominalValue = nominalValue;
+    retention = retention;
 
     double initialTotal = 0.0;
     double finalTotal = 0.0;
@@ -80,24 +76,20 @@ class Bill {
       finalTotal += realValue;
     }
 
-    initialTotal; //.toPrecision(7);
-    finalTotal; //.toPrecision(7);
+    initialTotal;
+    finalTotal;
 
     int days = dueDate.difference(discountDate).inDays;
 
     double interestRate =
         (pow(1 + tea.value, days.toDouble() / tea.daysPerYear.toDouble()) - 1)
             .toDouble();
-    // .toPrecision(7);
 
-    double discountRate =
-        (interestRate / (1 + interestRate)); //.toPrecision(7);
-    double discount = (nominalValue * discountRate); //.toPrecision(2);
-    double netWorth = (nominalValue - discount); //.toPrecision(2);
-    double valueReceived =
-        (netWorth - initialTotal - retention); //.toPrecision(2);
-    double valueDelivered =
-        (nominalValue + finalTotal - retention); //.toPrecision(2);
+    double discountRate = (interestRate / (1 + interestRate));
+    double discount = (nominalValue * discountRate);
+    double netWorth = (nominalValue - discount);
+    double valueReceived = (netWorth - initialTotal - retention);
+    double valueDelivered = (nominalValue + finalTotal - retention);
     double tcea = pow(valueDelivered / valueReceived,
             tea.daysPerYear.toDouble() / days.toDouble()) -
         1;
