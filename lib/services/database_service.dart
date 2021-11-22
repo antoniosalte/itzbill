@@ -42,6 +42,7 @@ class DatabaseService {
       Pool pool = Pool.fromFirestore(
         data['id'],
         data['userId'],
+        data['name'],
         data['discountDate'].toDate(),
         rate,
         tea,
@@ -60,6 +61,7 @@ class DatabaseService {
 
   Future<Pool> createPool(
     String userId,
+    String name,
     DateTime discountDate,
     Rate rate,
     String currency,
@@ -71,6 +73,7 @@ class DatabaseService {
     Pool pool = Pool.createToFirestore(
       documentReference.id,
       userId,
+      name,
       discountDate,
       rate,
       currency,

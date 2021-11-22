@@ -4,6 +4,7 @@ import 'rate.dart';
 class Pool {
   String id;
   String userId;
+  String name;
   DateTime discountDate;
   Rate rate;
   Rate tea;
@@ -16,6 +17,7 @@ class Pool {
   Pool({
     required this.id,
     required this.userId,
+    required this.name,
     required this.discountDate,
     required this.rate,
     required this.tea,
@@ -29,6 +31,7 @@ class Pool {
   factory Pool.createToFirestore(
     String id,
     String userId,
+    String name,
     DateTime discountDate,
     Rate rate,
     String currency,
@@ -40,6 +43,7 @@ class Pool {
     return Pool(
       id: id,
       userId: userId,
+      name: name,
       discountDate: discountDate,
       rate: rate,
       tea: tea,
@@ -54,6 +58,7 @@ class Pool {
   factory Pool.fromFirestore(
     String id,
     String userId,
+    String name,
     DateTime discountDate,
     Rate rate,
     Rate tea,
@@ -66,6 +71,7 @@ class Pool {
     return Pool(
       id: id,
       userId: userId,
+      name: name,
       discountDate: discountDate,
       rate: rate,
       tea: tea,
@@ -91,6 +97,7 @@ class Pool {
     return <String, dynamic>{
       'id': id,
       'userId': userId,
+      'name': name,
       'discountDate': discountDate,
       'rate': rate.toFirestore(),
       'tea': tea.toFirestore(),

@@ -23,9 +23,11 @@ import 'package:itzbill/widgets/button_widget.dart';
 import 'dart:js' as js;
 
 class PoolScreen extends StatefulWidget {
-  PoolScreen({Key? key, required this.currency, this.pool}) : super(key: key);
+  PoolScreen({Key? key, required this.currency, required this.name, this.pool})
+      : super(key: key);
 
   final String currency;
+  final String name;
   Pool? pool;
 
   @override
@@ -46,6 +48,7 @@ class PoolScreenState extends State<PoolScreen> {
   bool loading = false;
   bool locked = false;
 
+  String name = "";
   String daysPerYear = "360";
   String rateTerm = "Anual";
   String rateType = "Efectiva";
@@ -151,8 +154,8 @@ class PoolScreenState extends State<PoolScreen> {
     setState(() => discountDate = newDate);
 
     if (dueDate != null && discountDate != null) {
-      if (dueDate!.compareTo(discountDate!) < 0) {
-        setState(() => dueDate = discountDate);
+      if (dueDate!.compareTo(discountDate!) <= 0) {
+        setState(() => dueDate = discountDate!.add(Duration(days: 1)));
       }
     }
   }
@@ -172,17 +175,24 @@ class PoolScreenState extends State<PoolScreen> {
   }
 
   Future pickDueDate() async {
+    DateTime initialDate = DateTime.now();
+    DateTime firstDate = DateTime(DateTime.now().year - 5);
+
     if (dueDate != null && discountDate != null) {
-      if (dueDate!.compareTo(discountDate!) < 0) {
-        setState(() => dueDate = discountDate);
+      if (dueDate!.compareTo(discountDate!) <= 0) {
+        setState(() => dueDate = discountDate!.add(Duration(days: 1)));
       }
     }
 
-    final initialDate = DateTime.now();
+    if (discountDate != null) {
+      firstDate = discountDate!.add(Duration(days: 1));
+      initialDate = firstDate;
+    }
+
     final newDate = await showDatePicker(
       context: context,
       initialDate: dueDate ?? initialDate,
-      firstDate: discountDate ?? DateTime(DateTime.now().year - 5),
+      firstDate: firstDate,
       lastDate: DateTime(DateTime.now().year + 5),
     );
 
@@ -236,6 +246,7 @@ class PoolScreenState extends State<PoolScreen> {
   }
 
   Future<void> _loadPool() async {
+    name = pool!.name;
     Rate rate = pool!.rate;
     rateType = rate.type;
     daysPerYear = rate.daysPerYear.toString();
@@ -311,6 +322,7 @@ class PoolScreenState extends State<PoolScreen> {
       try {
         pool = await _databaseService.createPool(
           auth!.uid,
+          widget.name,
           discountDate!,
           rate,
           widget.currency,
@@ -360,10 +372,6 @@ class PoolScreenState extends State<PoolScreen> {
     } on Error catch (e) {
       _stopLoading();
       _showToast('Error al agregar: $e', true);
-    }
-
-    try {} on Error catch (e) {
-      print(e.toString());
     }
   }
 
@@ -423,6 +431,7 @@ class PoolScreenState extends State<PoolScreen> {
     auth = Provider.of<AuthProvider>(context, listen: false);
     fToast.init(context);
     pool = widget.pool;
+    name = widget.name;
     if (pool != null) {
       _loadPool();
     }
@@ -460,6 +469,7 @@ class PoolScreenState extends State<PoolScreen> {
           child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          //TODO: Add name
           SizedBox(height: 24.0),
           TitleWidget(title: 'Letra Descontada a Tasa $rateType'),
           SizedBox(height: 24.0),

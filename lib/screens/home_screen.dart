@@ -3,6 +3,7 @@ import 'package:itzbill/models/pool.dart';
 import 'package:itzbill/models/rate.dart';
 import 'package:itzbill/screens/pool_screen.dart';
 import 'package:itzbill/widgets/button_widget.dart';
+import 'package:itzbill/widgets/subtitle_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -29,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool loading = false;
 
   String currency = "Soles";
+  String name = "";
 
   List<Pool> pools = [];
 
@@ -36,19 +38,27 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (context) => PoolScreen(currency: currency, pool: pool)),
+        builder: (context) => PoolScreen(
+          currency: pool.currency,
+          name: pool.name,
+          pool: pool,
+        ),
+      ),
     );
   }
 
   Future<void> _createPool() async {
+    name = "";
+
     bool create = await showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
+              title: Text('Crear nueva cartera'),
               content: Container(
-                height: 100,
+                height: 150,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -75,7 +85,26 @@ class _HomeScreenState extends State<HomeScreen> {
                           });
                         },
                       ),
-                    )
+                    ),
+                    TextField(
+                      keyboardType: TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: false,
+                      ),
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'Nombre de la cartera',
+                      ),
+                      style: TextStyle(
+                        fontSize: 16.0,
+                        height: 1.0,
+                      ),
+                      onChanged: ((value) => {
+                            setState(() {
+                              name = value;
+                            })
+                          }),
+                    ),
                   ],
                 ),
               ),
@@ -98,7 +127,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (create) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => PoolScreen(currency: currency)),
+        MaterialPageRoute(
+          builder: (context) => PoolScreen(
+            currency: currency,
+            name: name,
+          ),
+        ),
       );
     }
   }
@@ -200,11 +234,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () => _loadPool(e),
                 child: Card(
                   child: Container(
-                    height: 100,
+                    height: 150,
                     width: double.infinity,
                     child: Column(
                       children: [
                         Text(e.id),
+                        Text(e.name),
                         Text(e.currency),
                         Text(e.rate.type),
                         Text(e.rate.value.toString()),
