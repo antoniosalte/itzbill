@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:itzbill/models/pool.dart';
-import 'package:itzbill/models/rate.dart';
-import 'package:itzbill/screens/pool_screen.dart';
-import 'package:itzbill/widgets/button_widget.dart';
-import 'package:itzbill/widgets/subtitle_widget.dart';
+
 import 'package:provider/provider.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:itzbill/models/pool.dart';
+import 'package:itzbill/models/rate.dart';
+
 import 'package:itzbill/providers/auth_provider.dart';
 import 'package:itzbill/services/database_service.dart';
+import 'package:itzbill/screens/pool_screen.dart';
 
 import 'package:itzbill/widgets/header_button_widget.dart';
 import 'package:itzbill/widgets/toast_widget.dart';
 import 'package:itzbill/widgets/loading_widget.dart';
+import 'package:itzbill/widgets/button_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   HomeScreen({Key? key}) : super(key: key);
@@ -31,6 +32,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String currency = "Soles";
   String name = "";
+
+  Map<String, int> rateMap = {
+    "Anual": 360,
+    "Semestral": 180,
+    "Cuatrimestral": 120,
+    "Trimestral": 90,
+    "Bimestral": 60,
+    "Mensual": 30,
+    "Quincenal": 15,
+    "Diario": 1
+  };
 
   List<Pool> pools = [];
 
@@ -226,26 +238,96 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: Padding(
-        padding: EdgeInsets.all(64.0),
+        padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 64.0),
         child: Column(
           children: [
             ...pools.map((e) {
-              return InkWell(
-                onTap: () => _loadPool(e),
-                child: Card(
-                  child: Container(
-                    height: 150,
-                    width: double.infinity,
-                    child: Column(
-                      children: [
-                        Text(e.id),
-                        Text(e.name),
-                        Text(e.currency),
-                        Text(e.rate.type),
-                        Text(e.rate.value.toString()),
-                        Text(e.tcea.toString()),
-                        Text(e.receivedTotal.toString()),
-                      ],
+              return Padding(
+                padding: EdgeInsets.only(bottom: 32.0),
+                child: InkWell(
+                  onTap: () => _loadPool(e),
+                  child: Card(
+                    child: Container(
+                      height: 325,
+                      width: double.infinity,
+                      child: Column(
+                        children: [
+                          ListTile(
+                            title: Text(
+                              e.name == "" ? "Cartera de Letra" : e.name,
+                              style: TextStyle(
+                                fontSize: 22.0,
+                              ),
+                            ),
+                            // subtitle: Text('Tasa ${e.rate.type}'),
+                          ),
+                          Divider(height: 1.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Flexible(
+                                child: Column(
+                                  children: [
+                                    ListTile(
+                                      leading: Icon(Icons.calendar_today),
+                                      title:
+                                          Text(e.rate.daysPerYear.toString()),
+                                      subtitle: Text('Dias por año'),
+                                    ),
+                                    ListTile(
+                                      leading: Text(
+                                        '%',
+                                        style: TextStyle(fontSize: 20.0),
+                                      ),
+                                      title: Text(
+                                          '${(e.rate.value * 100).toStringAsFixed(7)} %'),
+                                      subtitle: Text('Tasa ${e.rate.type}'),
+                                    ),
+                                    ListTile(
+                                      leading: Icon(Icons.date_range),
+                                      title: Text(
+                                          '${rateMap.keys.firstWhere((k) => rateMap[k] == e.rate.termDays)} (${e.rate.termDays} dia${e.rate.termDays > 1 ? 's' : ''})'),
+                                      subtitle: Text('Plazo de Tasa'),
+                                    ),
+                                    _buildCapitalizationDays(e.rate),
+                                  ],
+                                ),
+                              ),
+                              Flexible(
+                                child: Column(
+                                  children: [
+                                    ListTile(
+                                      leading: Icon(Icons.attach_money),
+                                      title: Text(e.currency),
+                                      subtitle: Text('Moneda'),
+                                    ),
+                                    ListTile(
+                                      leading: Icon(Icons.money),
+                                      title: Text(
+                                          e.receivedTotal.toStringAsFixed(2)),
+                                      subtitle: Text('Valor Total a Recibir'),
+                                    ),
+                                    ListTile(
+                                      leading: Icon(Icons.today),
+                                      title: Text(
+                                          '${e.discountDate.day}/${e.discountDate.month}/${e.discountDate.year}'),
+                                      subtitle: Text('Fecha de Descuento'),
+                                    ),
+                                    ListTile(
+                                      leading: Text("TCEA"),
+                                      title: Text(
+                                          '${(e.tcea * 100).toStringAsFixed(7)} %'),
+                                      subtitle:
+                                          Text('Tasa de Coste Efectiva Anual'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -256,5 +338,16 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildCapitalizationDays(Rate rate) {
+    return rate.type == "Nominal"
+        ? ListTile(
+            leading: Icon(Icons.date_range),
+            title: Text(
+                '${rateMap.keys.firstWhere((k) => rateMap[k] == rate.capitalizationDays)} (${rate.capitalizationDays} dia${rate.capitalizationDays > 1 ? 's' : ''})'),
+            subtitle: Text('Plazo de Tasa'),
+          )
+        : SizedBox(height: 0.0);
   }
 }

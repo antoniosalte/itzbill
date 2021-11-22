@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 class HeaderButton extends StatelessWidget {
-  const HeaderButton({Key? key, required this.title, this.onPressed})
+  const HeaderButton({Key? key, required this.title, required this.onPressed})
       : super(key: key);
 
   final String title;
-  final Function()? onPressed;
+  final Function() onPressed;
 
   @override
   Widget build(BuildContext context) {
