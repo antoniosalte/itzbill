@@ -11,7 +11,6 @@ import 'package:itzbill/providers/auth_provider.dart';
 import 'package:itzbill/services/database_service.dart';
 import 'package:itzbill/screens/pool_screen.dart';
 
-import 'package:itzbill/widgets/header_button_widget.dart';
 import 'package:itzbill/widgets/toast_widget.dart';
 import 'package:itzbill/widgets/loading_widget.dart';
 import 'package:itzbill/widgets/button_widget.dart';
@@ -225,14 +224,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Color color = Theme.of(context).primaryColor;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 80.0,
         //title: LogoWidget(fontSize: 48, alternative: true),
         backgroundColor: Theme.of(context).colorScheme.primary,
         actions: [
-          HeaderButton(
-            title: 'Logout',
+          IconButton(
+            icon: Icon(Icons.logout),
+            color: Theme.of(context).colorScheme.onSecondary,
             onPressed: _logout,
           ),
         ],
@@ -261,7 +262,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             // subtitle: Text('Tasa ${e.rate.type}'),
                           ),
-                          Divider(height: 1.0),
+                          Divider(
+                            height: 1.0,
+                            color:
+                                Theme.of(context).primaryColor.withOpacity(0.3),
+                          ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.start,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +275,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Column(
                                   children: [
                                     ListTile(
-                                      leading: Icon(Icons.calendar_today),
+                                      leading: Icon(
+                                        Icons.calendar_today,
+                                        color: color,
+                                      ),
                                       title:
                                           Text(e.rate.daysPerYear.toString()),
                                       subtitle: Text('Dias por año'),
@@ -278,14 +286,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ListTile(
                                       leading: Text(
                                         '%',
-                                        style: TextStyle(fontSize: 20.0),
+                                        style: TextStyle(
+                                          fontSize: 20.0,
+                                          color: color,
+                                        ),
                                       ),
                                       title: Text(
                                           '${(e.rate.value * 100).toStringAsFixed(7)} %'),
                                       subtitle: Text('Tasa ${e.rate.type}'),
                                     ),
                                     ListTile(
-                                      leading: Icon(Icons.date_range),
+                                      leading: Icon(
+                                        Icons.date_range,
+                                        color: color,
+                                      ),
                                       title: Text(
                                           '${rateMap.keys.firstWhere((k) => rateMap[k] == e.rate.termDays)} (${e.rate.termDays} dia${e.rate.termDays > 1 ? 's' : ''})'),
                                       subtitle: Text('Plazo de Tasa'),
@@ -298,24 +312,38 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Column(
                                   children: [
                                     ListTile(
-                                      leading: Icon(Icons.attach_money),
+                                      leading: Icon(
+                                        Icons.attach_money,
+                                        color: color,
+                                      ),
                                       title: Text(e.currency),
                                       subtitle: Text('Moneda'),
                                     ),
                                     ListTile(
-                                      leading: Icon(Icons.money),
+                                      leading: Icon(
+                                        Icons.money,
+                                        color: color,
+                                      ),
                                       title: Text(
                                           e.receivedTotal.toStringAsFixed(2)),
                                       subtitle: Text('Valor Total a Recibir'),
                                     ),
                                     ListTile(
-                                      leading: Icon(Icons.today),
+                                      leading: Icon(
+                                        Icons.today,
+                                        color: color,
+                                      ),
                                       title: Text(
                                           '${e.discountDate.day}/${e.discountDate.month}/${e.discountDate.year}'),
                                       subtitle: Text('Fecha de Descuento'),
                                     ),
                                     ListTile(
-                                      leading: Text("TCEA"),
+                                      leading: Text(
+                                        "TCEA",
+                                        style: TextStyle(
+                                          color: color,
+                                        ),
+                                      ),
                                       title: Text(
                                           '${(e.tcea * 100).toStringAsFixed(7)} %'),
                                       subtitle:
@@ -343,7 +371,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCapitalizationDays(Rate rate) {
     return rate.type == "Nominal"
         ? ListTile(
-            leading: Icon(Icons.date_range),
+            leading: Icon(
+              Icons.date_range,
+              color: Theme.of(context).primaryColor,
+            ),
             title: Text(
                 '${rateMap.keys.firstWhere((k) => rateMap[k] == rate.capitalizationDays)} (${rate.capitalizationDays} dia${rate.capitalizationDays > 1 ? 's' : ''})'),
             subtitle: Text('Plazo de Tasa'),

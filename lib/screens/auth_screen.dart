@@ -135,22 +135,20 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Center(
         child: Row(
-          // mainAxisAlignment: MainAxisAlignment.,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: Container(
-                width: double.infinity,
-                height: double.infinity,
+              child: Center(
+                child: Image.asset('assets/logo.png'),
               ),
             ),
             Expanded(
               child: Container(
                 width: double.infinity,
                 height: double.infinity,
-                //color: Colors.blue,
                 child: Form(
                   key: formKey,
                   child: Center(

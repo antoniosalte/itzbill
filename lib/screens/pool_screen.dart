@@ -15,7 +15,6 @@ import 'package:itzbill/models/bill.dart';
 import 'package:itzbill/widgets/subtitle_widget.dart';
 import 'package:itzbill/widgets/title_widget.dart';
 import 'package:itzbill/widgets/label_widget.dart';
-import 'package:itzbill/widgets/header_button_widget.dart';
 import 'package:itzbill/widgets/loading_widget.dart';
 import 'package:itzbill/widgets/toast_widget.dart';
 import 'package:itzbill/widgets/button_widget.dart';
@@ -459,8 +458,9 @@ class PoolScreenState extends State<PoolScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
-          HeaderButton(
-            title: 'Logout',
+          IconButton(
+            icon: Icon(Icons.logout),
+            color: Theme.of(context).colorScheme.onSecondary,
             onPressed: _logout,
           ),
         ],
