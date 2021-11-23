@@ -15,6 +15,7 @@ class DatabaseService {
     QuerySnapshot query = await _firestore
         .collection('pool')
         .where('userId', isEqualTo: uid)
+        .orderBy('createdAt')
         .get();
 
     for (DocumentSnapshot document in query.docs) {
@@ -43,6 +44,7 @@ class DatabaseService {
         data['id'],
         data['userId'],
         data['name'],
+        data['createdAt'].toDate(),
         data['discountDate'].toDate(),
         rate,
         tea,
@@ -94,12 +96,17 @@ class DatabaseService {
     });
   }
 
+  Future<void> deletePool(String poolId) async {
+    await _firestore.collection('pool').doc(poolId).delete();
+  }
+
   Future<List<Bill>> loadBills(String poolId) async {
     List<Bill> bills = [];
 
     QuerySnapshot query = await _firestore
         .collection('bill')
         .where('poolId', isEqualTo: poolId)
+        .orderBy('createdAt')
         .get();
 
     for (DocumentSnapshot document in query.docs) {

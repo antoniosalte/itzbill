@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:itzbill/models/rate.dart';
 import 'package:provider/provider.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:itzbill/providers/auth_provider.dart';
 import 'package:itzbill/services/database_service.dart';
@@ -12,8 +11,6 @@ import 'package:itzbill/models/pool.dart';
 import 'package:itzbill/models/expense.dart';
 import 'package:itzbill/models/bill.dart';
 
-import 'package:itzbill/widgets/subtitle_widget.dart';
-import 'package:itzbill/widgets/title_widget.dart';
 import 'package:itzbill/widgets/label_widget.dart';
 import 'package:itzbill/widgets/loading_widget.dart';
 import 'package:itzbill/widgets/toast_widget.dart';
@@ -225,25 +222,6 @@ class PoolScreenState extends State<PoolScreen> {
     );
   }
 
-  Future<void> _logout() async {
-    if (loading) return;
-
-    _startLoading();
-
-    try {
-      AuthProvider auth = Provider.of<AuthProvider>(context, listen: false);
-      await auth.signOut();
-      _stopLoading();
-      _showToast("Logout successful");
-    } on FirebaseAuthException catch (e) {
-      _stopLoading();
-      _showToast(e.message.toString(), true);
-    } on Error catch (e) {
-      _stopLoading();
-      _showToast(e.toString(), true);
-    }
-  }
-
   Future<void> _loadPool() async {
     name = pool!.name;
     Rate rate = pool!.rate;
@@ -391,7 +369,6 @@ class PoolScreenState extends State<PoolScreen> {
 
       _stopLoading();
       _showToast("Eliminado con exito");
-      //calculateXIRR();
     } on Error catch (e) {
       _stopLoading();
       _showToast('Error al eliminar: $e', true);
@@ -399,28 +376,34 @@ class PoolScreenState extends State<PoolScreen> {
   }
 
   void _calculateXIRR() {
-    js.JsArray dates = new js.JsArray();
-    js.JsArray amounts = new js.JsArray();
+    if (bills.length >= 1) {
+      js.JsArray dates = new js.JsArray();
+      js.JsArray amounts = new js.JsArray();
 
-    double sum = 0.0;
-    for (Bill bill in bills) {
-      DateTime dateTime = bill.dueDate;
-      String date = "${dateTime.year}/${dateTime.month}/${dateTime.day}";
-      amounts.add((-bill.valueDelivered).toString());
-      sum += -bill.valueDelivered;
-      dates.add(date);
+      double sum = 0.0;
+      for (Bill bill in bills) {
+        DateTime dateTime = bill.dueDate;
+        String date = "${dateTime.year}/${dateTime.month}/${dateTime.day}";
+        amounts.add((-bill.valueDelivered).toString());
+        sum += -bill.valueDelivered;
+        dates.add(date);
+      }
+
+      DateTime a = pool!.discountDate;
+
+      amounts.add(valueReceivedTotal);
+      dates.add("${a.year}/${a.month}/${a.day}");
+
+      js.context.callMethod('alertMessage', [dates, amounts]);
+      var state = js.JsObject.fromBrowserObject(js.context['state']);
+      setState(() {
+        tcea = state['xirr'];
+      });
+    } else {
+      setState(() {
+        tcea = 0.0;
+      });
     }
-
-    DateTime a = pool!.discountDate;
-
-    amounts.add(valueReceivedTotal);
-    dates.add("${a.year}/${a.month}/${a.day}");
-
-    js.context.callMethod('alertMessage', [dates, amounts]);
-    var state = js.JsObject.fromBrowserObject(js.context['state']);
-    setState(() {
-      tcea = state['xirr'];
-    });
   }
 
   @override
@@ -446,1000 +429,1108 @@ class PoolScreenState extends State<PoolScreen> {
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
     double cardWidth = (width / 8) * 3;
+    TextStyle cardTitleStyle = TextStyle(
+      fontSize: 24,
+      color: Theme.of(context).primaryColor,
+    );
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 80.0,
-        //title: LogoWidget(fontSize: 48, alternative: true),
-        backgroundColor: Theme.of(context).colorScheme.primary,
         leadingWidth: 100,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new),
-          color: Theme.of(context).colorScheme.onSecondary,
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            pool!.tcea = tcea;
+            pool!.receivedTotal = valueReceivedTotal;
+            Navigator.of(context).pop(pool);
+          },
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.logout),
-            color: Theme.of(context).colorScheme.onSecondary,
-            onPressed: _logout,
-          ),
-        ],
+        title: Text(
+          name != ""
+              ? '${name} (Letra de Cambio a Tasa $rateType)'
+              : 'Letra de Cambio a Tasa $rateType',
+          style: TextStyle(color: Theme.of(context).primaryColor),
+        ),
       ),
       body: SingleChildScrollView(
-          child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          //TODO: Add name
-          SizedBox(height: 24.0),
-          TitleWidget(title: 'Letra Descontada a Tasa $rateType'),
-          SizedBox(height: 24.0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Card(
-                child: Container(
-                  width: cardWidth,
-                  padding: EdgeInsets.all(32.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SubtitleWidget(title: "Tasa y Plazo"),
-                      SizedBox(height: 16.0),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Dias por año'),
-                            Flexible(
-                              child: Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey,
-                                    width: 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4.0),
-                                ),
-                                child: Center(
-                                  child: DropdownButton<String>(
-                                    value: daysPerYear,
-                                    underline: Container(
-                                      height: 0,
-                                    ),
-                                    onChanged: locked
-                                        ? null
-                                        : (String? newValue) {
-                                            setState(() {
-                                              daysPerYear = newValue!;
-                                            });
-                                          },
-                                    items: daysPerYearOptions
-                                        .map<DropdownMenuItem<String>>(
-                                            (String value) {
-                                      return DropdownMenuItem<String>(
-                                        value: value,
-                                        child: Text(value),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Plazo de Tasa'),
-                            Flexible(
-                              child: Row(
-                                children: [
-                                  Flexible(
-                                    child: Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Colors.grey,
-                                          width: 1,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(4.0),
-                                      ),
-                                      child: Center(
-                                        child: DropdownButton<String>(
-                                          value: rateTerm,
-                                          underline: Container(
-                                            height: 0,
-                                          ),
-                                          onChanged: locked
-                                              ? null
-                                              : (String? newValue) {
-                                                  setState(() {
-                                                    rateTerm = newValue!;
-                                                    rateTermDays =
-                                                        rateMap[rateTerm]!;
-                                                  });
-                                                },
-                                          items: rateTerms
-                                              .map<DropdownMenuItem<String>>(
-                                                  (String value) {
-                                            return DropdownMenuItem<String>(
-                                              value: value,
-                                              child: Text(value),
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 4.0),
-                                  Flexible(
-                                    child: Container(
-                                      width: double.infinity,
-                                      height: 50.0,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Colors.grey,
-                                          width: 1,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(4.0),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          "$rateTermDays dia${rateTermDays > 1 ? 's' : ''}",
-                                          style: TextStyle(
-                                            color: locked
-                                                ? Colors.grey
-                                                : Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: Row(
-                                children: [
-                                  LabelWidget(label: 'Tasa'),
-                                  SizedBox(width: 8.0),
-                                  Flexible(
-                                    child: Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Colors.grey,
-                                          width: 1,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(4.0),
-                                      ),
-                                      child: Center(
-                                        child: DropdownButton<String>(
-                                          value: rateType,
-                                          underline: Container(
-                                            height: 0,
-                                          ),
-                                          onChanged: locked
-                                              ? null
-                                              : (String? newValue) {
-                                                  setState(() {
-                                                    rateType = newValue!;
-                                                  });
-                                                },
-                                          items: rateTypes
-                                              .map<DropdownMenuItem<String>>(
-                                                  (String value) {
-                                            return DropdownMenuItem<String>(
-                                              value: value,
-                                              child: Text(value),
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Flexible(
-                              child: Row(
-                                children: [
-                                  Flexible(
-                                    child: TextField(
-                                      enabled: !locked,
-                                      controller: rateValueController,
-                                      keyboardType:
-                                          TextInputType.numberWithOptions(
-                                        decimal: true,
-                                        signed: false,
-                                      ),
-                                      decoration: InputDecoration(
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.allow(
-                                            _amountValidator),
-                                      ],
-                                      style: TextStyle(
-                                        fontSize: 16.0,
-                                        height: 1.0,
-                                        color:
-                                            locked ? Colors.grey : Colors.black,
-                                      ),
-                                      onChanged: ((value) => {
-                                            setState(() {
-                                              rateValue = value;
-                                            })
-                                          }),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8.0),
-                                  Text(
-                                    "%",
-                                    style: TextStyle(fontSize: 24.0),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      _buildRateCapitalization(),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Fecha de Descuento'),
-                            Flexible(
-                              child: Container(
-                                width: double.infinity,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey,
-                                    width: 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4.0),
-                                ),
-                                child: Center(
-                                  child: TextButton(
-                                    child: Text(
-                                      getDateText(discountDate),
-                                      style: TextStyle(
-                                        color:
-                                            locked ? Colors.grey : Colors.black,
-                                      ),
-                                    ),
-                                    onPressed: locked
-                                        ? null
-                                        : () => pickDiscountDate(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Card(
-                child: Container(
-                  width: cardWidth,
-                  padding: EdgeInsets.all(32.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SubtitleWidget(title: "Datos de la Letra"),
-                      SizedBox(height: 16.0),
-                      _buildCapitalizationHelper(),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Fecha de Giro'),
-                            Flexible(
-                              child: Container(
-                                width: double.infinity,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey,
-                                    width: 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4.0),
-                                ),
-                                child: Center(
-                                  child: TextButton(
-                                    child: Text(
-                                      getDateText(turnDate),
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                    onPressed: () => pickTurnDate(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Fecha de Vencimiento'),
-                            Flexible(
-                              child: Container(
-                                width: double.infinity,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey,
-                                    width: 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4.0),
-                                ),
-                                child: Center(
-                                  child: TextButton(
-                                    child: Text(
-                                      getDateText(dueDate),
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                    onPressed: () => pickDueDate(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Valor Nominal'),
-                            Flexible(
-                              child: TextField(
-                                keyboardType: TextInputType.numberWithOptions(
-                                  decimal: true,
-                                  signed: false,
-                                ),
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(),
-                                ),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                      _amountValidator),
-                                ],
-                                style: TextStyle(
-                                  fontSize: 16.0,
-                                  height: 1.0,
-                                ),
-                                onChanged: ((value) => {
-                                      setState(() {
-                                        nominalValue = value;
-                                      })
-                                    }),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Retencion'),
-                            Flexible(
-                              child: TextField(
-                                keyboardType: TextInputType.numberWithOptions(
-                                  decimal: true,
-                                  signed: false,
-                                ),
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(),
-                                ),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                      _amountValidator),
-                                ],
-                                style: TextStyle(
-                                  fontSize: 16.0,
-                                  height: 1.0,
-                                ),
-                                onChanged: ((value) => {
-                                      setState(() {
-                                        retentionValue = value;
-                                      })
-                                    }),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 32.0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Card(
-                child: Container(
-                  width: cardWidth,
-                  padding: EdgeInsets.all(32.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SubtitleWidget(title: "Costes / Gastos Iniciales"),
-                      SizedBox(height: 16.0),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Motivo'),
-                            Flexible(
-                              child: Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey,
-                                    width: 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4.0),
-                                ),
-                                child: Center(
-                                  child: DropdownButton<String>(
-                                    value: initialReason,
-                                    underline: Container(
-                                      height: 0,
-                                    ),
-                                    onChanged: locked
-                                        ? null
-                                        : (String? newValue) {
-                                            setState(() {
-                                              initialReason = newValue!;
-                                            });
-                                          },
-                                    items: initialReasons
-                                        .map<DropdownMenuItem<String>>(
-                                            (String value) {
-                                      return DropdownMenuItem<String>(
-                                        value: value,
-                                        child: Text(value),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Valor expresado en'),
-                            Flexible(
-                              child: Row(
-                                children: [
-                                  Flexible(
-                                    child: Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Colors.grey,
-                                          width: 1,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(4.0),
-                                      ),
-                                      child: Center(
-                                        child: DropdownButton<String>(
-                                          value: initialValueType,
-                                          underline: Container(
-                                            height: 0,
-                                          ),
-                                          onChanged: locked
-                                              ? null
-                                              : (String? newValue) {
-                                                  setState(() {
-                                                    initialValueType =
-                                                        newValue!;
-                                                  });
-                                                },
-                                          items: valueTypes
-                                              .map<DropdownMenuItem<String>>(
-                                                  (String value) {
-                                            return DropdownMenuItem<String>(
-                                              value: value,
-                                              child: Text(value),
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 4.0),
-                                  Flexible(
-                                    child: Row(
-                                      children: [
-                                        Flexible(
-                                          child: TextField(
-                                            enabled: !locked,
-                                            keyboardType:
-                                                TextInputType.numberWithOptions(
-                                              decimal: true,
-                                              signed: false,
-                                            ),
-                                            decoration: InputDecoration(
-                                              border: OutlineInputBorder(),
-                                            ),
-                                            inputFormatters: [
-                                              FilteringTextInputFormatter.allow(
-                                                  _amountValidator),
-                                            ],
-                                            style: TextStyle(
-                                              fontSize: 16.0,
-                                              height: 1.0,
-                                              color: locked
-                                                  ? Colors.grey
-                                                  : Colors.black,
-                                            ),
-                                            onChanged: ((value) => {
-                                                  setState(() {
-                                                    initialValue = value;
-                                                  })
-                                                }),
-                                          ),
-                                        ),
-                                        SizedBox(
-                                            width: initialValueType ==
-                                                    "En Efectivo"
-                                                ? 0.0
-                                                : 8.0),
-                                        Text(
-                                          initialValueType == "En Efectivo"
-                                              ? ""
-                                              : "%",
-                                          style: TextStyle(fontSize: 24.0),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 8.0),
-                      ButtonWidget(
-                        text: "Agregar",
-                        onPressed: locked
-                            ? null
-                            : () {
-                                if (initialReason != '') {
-                                  setState(() {
-                                    double value = double.parse(initialValue!);
-                                    if (initialValueType == "En Porcentaje") {
-                                      value /= 100;
-                                    }
-                                    initialExpenses.add(
-                                      Expense.fromMenu(
-                                        "Initial",
-                                        initialReason,
-                                        initialValueType,
-                                        value,
-                                      ),
-                                    );
-                                    initialReasons.remove(initialReason);
-                                    initialReason = initialReasons.length > 0
-                                        ? initialReasons[0]
-                                        : '';
-                                  });
-                                }
-                              },
-                      ),
-                      Container(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            dataTextStyle: TextStyle(
-                              color: locked ? Colors.grey : Colors.black,
-                            ),
-                            columns: [
-                              DataColumn(label: Text('Index')),
-                              DataColumn(label: Text('Motivo')),
-                              DataColumn(label: Text('Tipo')),
-                              DataColumn(label: Text('Valor')),
-                              DataColumn(label: Text('Acciones')),
-                            ],
-                            rows: initialExpenses.map((e) {
-                              int index = initialExpenses.indexOf(e);
-                              String value = e.valueType == "En Efectivo"
-                                  ? "${e.value}"
-                                  : "${e.value * 100} %";
-                              return DataRow(cells: [
-                                DataCell(Text((index + 1).toString())),
-                                DataCell(Text(e.reason)),
-                                DataCell(Text(e.valueType)),
-                                DataCell(Text(value)),
-                                DataCell(
-                                  IconButton(
-                                    icon: Icon(Icons.delete),
-                                    onPressed: locked
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              initialExpenses.remove(e);
-                                              initialReasons.add(e.reason);
-                                              if (initialReason == '') {
-                                                initialReason =
-                                                    initialReasons[0];
-                                              }
-                                            });
-                                          },
-                                  ),
-                                ),
-                              ]);
-                            }).toList(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Card(
+                  child: Container(
+                    width: cardWidth,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ListTile(
+                          title: Text(
+                            "Tasa y Plazo",
+                            style: cardTitleStyle,
                           ),
                         ),
-                      ),
-                    ],
+                        Divider(height: 1.0),
+                        SizedBox(height: 16.0),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 20.0),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Dias por año'),
+                                    Flexible(
+                                      child: Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width: 1,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(4.0),
+                                        ),
+                                        child: Center(
+                                          child: DropdownButton<String>(
+                                            value: daysPerYear,
+                                            underline: Container(
+                                              height: 0,
+                                            ),
+                                            onChanged: locked
+                                                ? null
+                                                : (String? newValue) {
+                                                    setState(() {
+                                                      daysPerYear = newValue!;
+                                                    });
+                                                  },
+                                            items: daysPerYearOptions
+                                                .map<DropdownMenuItem<String>>(
+                                                    (String value) {
+                                              return DropdownMenuItem<String>(
+                                                value: value,
+                                                child: Text(value),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Plazo de Tasa'),
+                                    Flexible(
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: Container(
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                  color: Colors.grey,
+                                                  width: 1,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(4.0),
+                                              ),
+                                              child: Center(
+                                                child: DropdownButton<String>(
+                                                  value: rateTerm,
+                                                  underline: Container(
+                                                    height: 0,
+                                                  ),
+                                                  onChanged: locked
+                                                      ? null
+                                                      : (String? newValue) {
+                                                          setState(() {
+                                                            rateTerm =
+                                                                newValue!;
+                                                            rateTermDays =
+                                                                rateMap[
+                                                                    rateTerm]!;
+                                                          });
+                                                        },
+                                                  items: rateTerms.map<
+                                                          DropdownMenuItem<
+                                                              String>>(
+                                                      (String value) {
+                                                    return DropdownMenuItem<
+                                                        String>(
+                                                      value: value,
+                                                      child: Text(value),
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(width: 4.0),
+                                          Flexible(
+                                            child: Container(
+                                              width: double.infinity,
+                                              height: 50.0,
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                  color: Colors.grey,
+                                                  width: 1,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(4.0),
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  "$rateTermDays dia${rateTermDays > 1 ? 's' : ''}",
+                                                  style: TextStyle(
+                                                    color: locked
+                                                        ? Colors.grey
+                                                        : Colors.black,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Row(
+                                        children: [
+                                          LabelWidget(label: 'Tasa'),
+                                          SizedBox(width: 8.0),
+                                          Flexible(
+                                            child: Container(
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                  color: Colors.grey,
+                                                  width: 1,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(4.0),
+                                              ),
+                                              child: Center(
+                                                child: DropdownButton<String>(
+                                                  value: rateType,
+                                                  underline: Container(
+                                                    height: 0,
+                                                  ),
+                                                  onChanged: locked
+                                                      ? null
+                                                      : (String? newValue) {
+                                                          setState(() {
+                                                            rateType =
+                                                                newValue!;
+                                                          });
+                                                        },
+                                                  items: rateTypes.map<
+                                                          DropdownMenuItem<
+                                                              String>>(
+                                                      (String value) {
+                                                    return DropdownMenuItem<
+                                                        String>(
+                                                      value: value,
+                                                      child: Text(value),
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Flexible(
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: TextField(
+                                              enabled: !locked,
+                                              controller: rateValueController,
+                                              keyboardType: TextInputType
+                                                  .numberWithOptions(
+                                                decimal: true,
+                                                signed: false,
+                                              ),
+                                              decoration: InputDecoration(
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              inputFormatters: [
+                                                FilteringTextInputFormatter
+                                                    .allow(_amountValidator),
+                                              ],
+                                              style: TextStyle(
+                                                fontSize: 16.0,
+                                                height: 1.0,
+                                                color: locked
+                                                    ? Colors.grey
+                                                    : Colors.black,
+                                              ),
+                                              onChanged: ((value) => {
+                                                    setState(() {
+                                                      rateValue = value;
+                                                    })
+                                                  }),
+                                            ),
+                                          ),
+                                          SizedBox(width: 8.0),
+                                          Text(
+                                            "%",
+                                            style: TextStyle(fontSize: 24.0),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _buildRateCapitalization(),
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Fecha de Descuento'),
+                                    Flexible(
+                                      child: Container(
+                                        width: double.infinity,
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width: 1,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(4.0),
+                                        ),
+                                        child: Center(
+                                          child: TextButton(
+                                            child: Text(
+                                              getDateText(discountDate),
+                                              style: TextStyle(
+                                                color: locked
+                                                    ? Colors.grey
+                                                    : Colors.black,
+                                              ),
+                                            ),
+                                            onPressed: locked
+                                                ? null
+                                                : () => pickDiscountDate(),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 16.0),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              Card(
-                child: Container(
-                  width: cardWidth,
-                  padding: EdgeInsets.all(32.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SubtitleWidget(title: "Costes / Gastos Finales"),
-                      SizedBox(height: 16.0),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Motivo'),
-                            Flexible(
-                              child: Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey,
-                                    width: 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4.0),
-                                ),
-                                child: Center(
-                                  child: DropdownButton<String>(
-                                    value: finalReason,
-                                    underline: Container(
-                                      height: 0,
+                Card(
+                  child: Container(
+                    width: cardWidth,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ListTile(
+                          title: Text(
+                            "Datos de la Letra",
+                            style: cardTitleStyle,
+                          ),
+                        ),
+                        Divider(height: 1.0),
+                        SizedBox(height: 16.0),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 20.0),
+                          child: Column(
+                            children: [
+                              _buildCapitalizationHelper(),
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Fecha de Giro'),
+                                    Flexible(
+                                      child: Container(
+                                        width: double.infinity,
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width: 1,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(4.0),
+                                        ),
+                                        child: Center(
+                                          child: TextButton(
+                                            child: Text(
+                                              getDateText(turnDate),
+                                              style: TextStyle(
+                                                  color: Colors.black),
+                                            ),
+                                            onPressed: () => pickTurnDate(),
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                    onChanged: locked
-                                        ? null
-                                        : (String? newValue) {
-                                            setState(() {
-                                              finalReason = newValue!;
-                                            });
-                                          },
-                                    items: finalReasons
-                                        .map<DropdownMenuItem<String>>(
-                                            (String value) {
-                                      return DropdownMenuItem<String>(
-                                        value: value,
-                                        child: Text(value),
-                                      );
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Fecha de Vencimiento'),
+                                    Flexible(
+                                      child: Container(
+                                        width: double.infinity,
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width: 1,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(4.0),
+                                        ),
+                                        child: Center(
+                                          child: TextButton(
+                                            child: Text(
+                                              getDateText(dueDate),
+                                              style: TextStyle(
+                                                  color: Colors.black),
+                                            ),
+                                            onPressed: () => pickDueDate(),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Valor Nominal'),
+                                    Flexible(
+                                      child: TextField(
+                                        keyboardType:
+                                            TextInputType.numberWithOptions(
+                                          decimal: true,
+                                          signed: false,
+                                        ),
+                                        decoration: InputDecoration(
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.allow(
+                                              _amountValidator),
+                                        ],
+                                        style: TextStyle(
+                                          fontSize: 16.0,
+                                          height: 1.0,
+                                        ),
+                                        onChanged: ((value) => {
+                                              setState(() {
+                                                nominalValue = value;
+                                              })
+                                            }),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Retencion'),
+                                    Flexible(
+                                      child: TextField(
+                                        keyboardType:
+                                            TextInputType.numberWithOptions(
+                                          decimal: true,
+                                          signed: false,
+                                        ),
+                                        decoration: InputDecoration(
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.allow(
+                                              _amountValidator),
+                                        ],
+                                        style: TextStyle(
+                                          fontSize: 16.0,
+                                          height: 1.0,
+                                        ),
+                                        onChanged: ((value) => {
+                                              setState(() {
+                                                retentionValue = value;
+                                              })
+                                            }),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 16.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 32.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Card(
+                  child: Container(
+                    width: cardWidth,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ListTile(
+                          title: Text(
+                            "Costes / Gastos Iniciales",
+                            style: cardTitleStyle,
+                          ),
+                        ),
+                        Divider(height: 1.0),
+                        SizedBox(height: 16.0),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 20.0),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Motivo'),
+                                    Flexible(
+                                      child: Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width: 1,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(4.0),
+                                        ),
+                                        child: Center(
+                                          child: DropdownButton<String>(
+                                            value: initialReason,
+                                            underline: Container(
+                                              height: 0,
+                                            ),
+                                            onChanged: locked
+                                                ? null
+                                                : (String? newValue) {
+                                                    setState(() {
+                                                      initialReason = newValue!;
+                                                    });
+                                                  },
+                                            items: initialReasons
+                                                .map<DropdownMenuItem<String>>(
+                                                    (String value) {
+                                              return DropdownMenuItem<String>(
+                                                value: value,
+                                                child: Text(value),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Valor expresado en'),
+                                    Flexible(
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: Container(
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                  color: Colors.grey,
+                                                  width: 1,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(4.0),
+                                              ),
+                                              child: Center(
+                                                child: DropdownButton<String>(
+                                                  value: initialValueType,
+                                                  underline: Container(
+                                                    height: 0,
+                                                  ),
+                                                  onChanged: locked
+                                                      ? null
+                                                      : (String? newValue) {
+                                                          setState(() {
+                                                            initialValueType =
+                                                                newValue!;
+                                                          });
+                                                        },
+                                                  items: valueTypes.map<
+                                                          DropdownMenuItem<
+                                                              String>>(
+                                                      (String value) {
+                                                    return DropdownMenuItem<
+                                                        String>(
+                                                      value: value,
+                                                      child: Text(value),
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(width: 4.0),
+                                          Flexible(
+                                            child: Row(
+                                              children: [
+                                                Flexible(
+                                                  child: TextField(
+                                                    enabled: !locked,
+                                                    keyboardType: TextInputType
+                                                        .numberWithOptions(
+                                                      decimal: true,
+                                                      signed: false,
+                                                    ),
+                                                    decoration: InputDecoration(
+                                                      border:
+                                                          OutlineInputBorder(),
+                                                    ),
+                                                    inputFormatters: [
+                                                      FilteringTextInputFormatter
+                                                          .allow(
+                                                              _amountValidator),
+                                                    ],
+                                                    style: TextStyle(
+                                                      fontSize: 16.0,
+                                                      height: 1.0,
+                                                      color: locked
+                                                          ? Colors.grey
+                                                          : Colors.black,
+                                                    ),
+                                                    onChanged: ((value) => {
+                                                          setState(() {
+                                                            initialValue =
+                                                                value;
+                                                          })
+                                                        }),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                    width: initialValueType ==
+                                                            "En Efectivo"
+                                                        ? 0.0
+                                                        : 8.0),
+                                                Text(
+                                                  initialValueType ==
+                                                          "En Efectivo"
+                                                      ? ""
+                                                      : "%",
+                                                  style:
+                                                      TextStyle(fontSize: 24.0),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 8.0),
+                              ButtonWidget(
+                                text: "Agregar",
+                                onPressed: locked
+                                    ? null
+                                    : () {
+                                        if (initialReason != '') {
+                                          setState(() {
+                                            double value =
+                                                double.parse(initialValue!);
+                                            if (initialValueType ==
+                                                "En Porcentaje") {
+                                              value /= 100;
+                                            }
+                                            initialExpenses.add(
+                                              Expense.fromMenu(
+                                                "Initial",
+                                                initialReason,
+                                                initialValueType,
+                                                value,
+                                              ),
+                                            );
+                                            initialReasons
+                                                .remove(initialReason);
+                                            initialReason =
+                                                initialReasons.length > 0
+                                                    ? initialReasons[0]
+                                                    : '';
+                                          });
+                                        }
+                                      },
+                              ),
+                              Container(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: DataTable(
+                                    dataTextStyle: TextStyle(
+                                      color:
+                                          locked ? Colors.grey : Colors.black,
+                                    ),
+                                    columns: [
+                                      DataColumn(label: Text('Index')),
+                                      DataColumn(label: Text('Motivo')),
+                                      DataColumn(label: Text('Tipo')),
+                                      DataColumn(label: Text('Valor')),
+                                      DataColumn(label: Text('Acciones')),
+                                    ],
+                                    rows: initialExpenses.map((e) {
+                                      int index = initialExpenses.indexOf(e);
+                                      String value =
+                                          e.valueType == "En Efectivo"
+                                              ? "${e.value}"
+                                              : "${e.value * 100} %";
+                                      return DataRow(cells: [
+                                        DataCell(Text((index + 1).toString())),
+                                        DataCell(Text(e.reason)),
+                                        DataCell(Text(e.valueType)),
+                                        DataCell(Text(value)),
+                                        DataCell(
+                                          IconButton(
+                                            icon: Icon(Icons.delete),
+                                            onPressed: locked
+                                                ? null
+                                                : () {
+                                                    setState(() {
+                                                      initialExpenses.remove(e);
+                                                      initialReasons
+                                                          .add(e.reason);
+                                                      if (initialReason == '') {
+                                                        initialReason =
+                                                            initialReasons[0];
+                                                      }
+                                                    });
+                                                  },
+                                          ),
+                                        ),
+                                      ]);
                                     }).toList(),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LabelWidget(label: 'Valor expresado en'),
-                            Flexible(
-                              child: Row(
-                                children: [
-                                  Flexible(
-                                    child: Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Colors.grey,
-                                          width: 1,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(4.0),
-                                      ),
-                                      child: Center(
-                                        child: DropdownButton<String>(
-                                          value: finalValueType,
-                                          underline: Container(
-                                            height: 0,
-                                          ),
-                                          onChanged: locked
-                                              ? null
-                                              : (String? newValue) {
-                                                  setState(() {
-                                                    finalValueType = newValue!;
-                                                  });
-                                                },
-                                          items: valueTypes
-                                              .map<DropdownMenuItem<String>>(
-                                                  (String value) {
-                                            return DropdownMenuItem<String>(
-                                              value: value,
-                                              child: Text(value),
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 4.0),
-                                  Flexible(
-                                    child: Row(
-                                      children: [
-                                        Flexible(
-                                          child: TextField(
-                                            enabled: !locked,
-                                            keyboardType:
-                                                TextInputType.numberWithOptions(
-                                              decimal: true,
-                                              signed: false,
-                                            ),
-                                            decoration: InputDecoration(
-                                              border: OutlineInputBorder(),
-                                            ),
-                                            inputFormatters: [
-                                              FilteringTextInputFormatter.allow(
-                                                  _amountValidator),
-                                            ],
-                                            style: TextStyle(
-                                              fontSize: 16.0,
-                                              height: 1.0,
-                                              color: locked
-                                                  ? Colors.grey
-                                                  : Colors.black,
-                                            ),
-                                            onChanged: ((value) => {
-                                                  setState(() {
-                                                    finalValue = value;
-                                                  })
-                                                }),
-                                          ),
-                                        ),
-                                        SizedBox(
-                                            width:
-                                                finalValueType == "En Efectivo"
-                                                    ? 0.0
-                                                    : 8.0),
-                                        Text(
-                                          finalValueType == "En Efectivo"
-                                              ? ""
-                                              : "%",
-                                          style: TextStyle(fontSize: 24.0),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 8.0),
-                      ButtonWidget(
-                        text: "Agregar",
-                        onPressed: locked
-                            ? null
-                            : () {
-                                if (finalReason != '') {
-                                  setState(() {
-                                    double value = double.parse(finalValue!);
-                                    if (finalValueType == "En Porcentaje") {
-                                      value /= 100;
-                                    }
-                                    finalExpenses.add(
-                                      Expense.fromMenu("Final", finalReason,
-                                          finalValueType, value),
-                                    );
-                                    finalReasons.remove(finalReason);
-                                    finalReason = finalReasons.length > 0
-                                        ? finalReasons[0]
-                                        : '';
-                                  });
-                                }
-                              },
-                      ),
-                      Container(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            dataTextStyle: TextStyle(
-                              color: locked ? Colors.grey : Colors.black,
-                            ),
-                            columns: [
-                              DataColumn(label: Text('Index')),
-                              DataColumn(label: Text('Motivo')),
-                              DataColumn(label: Text('Tipo')),
-                              DataColumn(label: Text('Valor')),
-                              DataColumn(label: Text('Acciones')),
                             ],
-                            rows: finalExpenses.map((e) {
-                              int index = finalExpenses.indexOf(e);
-                              String value = e.valueType == "En Efectivo"
-                                  ? "${e.value}"
-                                  : "${e.value * 100} %";
-                              return DataRow(cells: [
-                                DataCell(Text((index + 1).toString())),
-                                DataCell(Text(e.reason)),
-                                DataCell(Text(e.valueType)),
-                                DataCell(Text(value)),
-                                DataCell(
-                                  IconButton(
-                                    icon: Icon(Icons.delete),
-                                    onPressed: locked
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              finalExpenses.remove(e);
-                                              finalReasons.add(e.reason);
-                                              if (finalReason == '') {
-                                                finalReason = finalReasons[0];
-                                              }
-                                            });
-                                          },
-                                  ),
-                                ),
-                              ]);
-                            }).toList(),
                           ),
                         ),
-                      ),
-                    ],
+                        SizedBox(height: 16.0),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(height: 32.0),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Card(
-              child: Column(
-                children: [
-                  SizedBox(height: 32.0),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 32.0),
-                    child: ButtonWidget(
-                      text: 'Agregar',
-                      onPressed: _addBill,
-                    ),
-                  ),
-                  SizedBox(height: 32.0),
-                  Container(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.vertical,
-                      child: DataTable(
-                        columns: [
-                          DataColumn(label: Text('N')),
-                          DataColumn(label: Text('Fecha Giro')),
-                          DataColumn(label: Text('Val. Nominal')),
-                          DataColumn(label: Text('Fecha Ven.')),
-                          DataColumn(label: Text('Dias')),
-                          DataColumn(label: Text('Retencion')),
-                          DataColumn(label: Text('TEP (i`)')),
-                          DataColumn(label: Text('d %')),
-                          DataColumn(label: Text('Descuento')),
-                          DataColumn(label: Text('Costes Ini.')),
-                          DataColumn(label: Text('Costes Fin.')),
-                          DataColumn(label: Text('Val. Neto')),
-                          DataColumn(label: Text('Val. Rec.')),
-                          DataColumn(label: Text('Val. Emt.')),
-                          DataColumn(label: Text('TCEA %')),
-                          DataColumn(label: Text('Acciones')),
-                        ],
-                        rows: bills.map((e) {
-                          int index = bills.indexOf(e);
-                          return DataRow(cells: [
-                            DataCell(Text((index + 1).toString())),
-                            DataCell(Text(getDateText(e.turnDate))),
-                            DataCell(Text(e.nominalValue.toStringAsFixed(2))),
-                            DataCell(Text(getDateText(e.dueDate))),
-                            DataCell(Text(e.days.toString())),
-                            DataCell(Text(e.retention.toStringAsFixed(2))),
-                            DataCell(Text(
-                                "${(e.interestRate * 100).toStringAsFixed(7)}%")),
-                            DataCell(Text(
-                                "${(e.discountRate * 100).toStringAsFixed(7)}%")),
-                            DataCell(Text(e.discount.toStringAsFixed(2))),
-                            DataCell(Text(e.initialTotal.toStringAsFixed(2))),
-                            DataCell(Text(e.finalTotal.toStringAsFixed(2))),
-                            DataCell(Text(e.netWorth.toStringAsFixed(2))),
-                            DataCell(Text(e.valueReceived.toStringAsFixed(2))),
-                            DataCell(Text(e.valueDelivered.toStringAsFixed(2))),
-                            DataCell(
-                                Text("${(e.tcea * 100).toStringAsFixed(7)}%")),
-                            DataCell(
-                              IconButton(
-                                icon: Icon(Icons.delete),
-                                onPressed: () => _deleteBill(e),
+                Card(
+                  child: Container(
+                    width: cardWidth,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ListTile(
+                          title: Text(
+                            "Costes / Gastos Finales",
+                            style: cardTitleStyle,
+                          ),
+                        ),
+                        Divider(height: 1.0),
+                        SizedBox(height: 16.0),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 20.0),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Motivo'),
+                                    Flexible(
+                                      child: Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width: 1,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(4.0),
+                                        ),
+                                        child: Center(
+                                          child: DropdownButton<String>(
+                                            value: finalReason,
+                                            underline: Container(
+                                              height: 0,
+                                            ),
+                                            onChanged: locked
+                                                ? null
+                                                : (String? newValue) {
+                                                    setState(() {
+                                                      finalReason = newValue!;
+                                                    });
+                                                  },
+                                            items: finalReasons
+                                                .map<DropdownMenuItem<String>>(
+                                                    (String value) {
+                                              return DropdownMenuItem<String>(
+                                                value: value,
+                                                child: Text(value),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ]);
-                        }).toList(),
-                      ),
+                              Container(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    LabelWidget(label: 'Valor expresado en'),
+                                    Flexible(
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: Container(
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                  color: Colors.grey,
+                                                  width: 1,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(4.0),
+                                              ),
+                                              child: Center(
+                                                child: DropdownButton<String>(
+                                                  value: finalValueType,
+                                                  underline: Container(
+                                                    height: 0,
+                                                  ),
+                                                  onChanged: locked
+                                                      ? null
+                                                      : (String? newValue) {
+                                                          setState(() {
+                                                            finalValueType =
+                                                                newValue!;
+                                                          });
+                                                        },
+                                                  items: valueTypes.map<
+                                                          DropdownMenuItem<
+                                                              String>>(
+                                                      (String value) {
+                                                    return DropdownMenuItem<
+                                                        String>(
+                                                      value: value,
+                                                      child: Text(value),
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(width: 4.0),
+                                          Flexible(
+                                            child: Row(
+                                              children: [
+                                                Flexible(
+                                                  child: TextField(
+                                                    enabled: !locked,
+                                                    keyboardType: TextInputType
+                                                        .numberWithOptions(
+                                                      decimal: true,
+                                                      signed: false,
+                                                    ),
+                                                    decoration: InputDecoration(
+                                                      border:
+                                                          OutlineInputBorder(),
+                                                    ),
+                                                    inputFormatters: [
+                                                      FilteringTextInputFormatter
+                                                          .allow(
+                                                              _amountValidator),
+                                                    ],
+                                                    style: TextStyle(
+                                                      fontSize: 16.0,
+                                                      height: 1.0,
+                                                      color: locked
+                                                          ? Colors.grey
+                                                          : Colors.black,
+                                                    ),
+                                                    onChanged: ((value) => {
+                                                          setState(() {
+                                                            finalValue = value;
+                                                          })
+                                                        }),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                    width: finalValueType ==
+                                                            "En Efectivo"
+                                                        ? 0.0
+                                                        : 8.0),
+                                                Text(
+                                                  finalValueType ==
+                                                          "En Efectivo"
+                                                      ? ""
+                                                      : "%",
+                                                  style:
+                                                      TextStyle(fontSize: 24.0),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 8.0),
+                              ButtonWidget(
+                                text: "Agregar",
+                                onPressed: locked
+                                    ? null
+                                    : () {
+                                        if (finalReason != '') {
+                                          setState(() {
+                                            double value =
+                                                double.parse(finalValue!);
+                                            if (finalValueType ==
+                                                "En Porcentaje") {
+                                              value /= 100;
+                                            }
+                                            finalExpenses.add(
+                                              Expense.fromMenu(
+                                                  "Final",
+                                                  finalReason,
+                                                  finalValueType,
+                                                  value),
+                                            );
+                                            finalReasons.remove(finalReason);
+                                            finalReason =
+                                                finalReasons.length > 0
+                                                    ? finalReasons[0]
+                                                    : '';
+                                          });
+                                        }
+                                      },
+                              ),
+                              Container(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: DataTable(
+                                    dataTextStyle: TextStyle(
+                                      color:
+                                          locked ? Colors.grey : Colors.black,
+                                    ),
+                                    columns: [
+                                      DataColumn(label: Text('Index')),
+                                      DataColumn(label: Text('Motivo')),
+                                      DataColumn(label: Text('Tipo')),
+                                      DataColumn(label: Text('Valor')),
+                                      DataColumn(label: Text('Acciones')),
+                                    ],
+                                    rows: finalExpenses.map((e) {
+                                      int index = finalExpenses.indexOf(e);
+                                      String value =
+                                          e.valueType == "En Efectivo"
+                                              ? "${e.value}"
+                                              : "${e.value * 100} %";
+                                      return DataRow(cells: [
+                                        DataCell(Text((index + 1).toString())),
+                                        DataCell(Text(e.reason)),
+                                        DataCell(Text(e.valueType)),
+                                        DataCell(Text(value)),
+                                        DataCell(
+                                          IconButton(
+                                            icon: Icon(Icons.delete),
+                                            onPressed: locked
+                                                ? null
+                                                : () {
+                                                    setState(() {
+                                                      finalExpenses.remove(e);
+                                                      finalReasons
+                                                          .add(e.reason);
+                                                      if (finalReason == '') {
+                                                        finalReason =
+                                                            finalReasons[0];
+                                                      }
+                                                    });
+                                                  },
+                                          ),
+                                        ),
+                                      ]);
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 16.0),
+                      ],
                     ),
                   ),
-                  SizedBox(height: 32.0),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 32.0),
-                    width: double.infinity,
-                    child: Text(
-                      "Valor a Recibir Total: ${valueReceivedTotal.toStringAsFixed(2)}",
-                      textAlign: TextAlign.end,
-                    ),
+                ),
+              ],
+            ),
+            SizedBox(height: 32.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Flexible(
+                  child: Text(
+                    "Valor a Recibir Total: ${valueReceivedTotal.toStringAsFixed(2)}",
+                    textAlign: TextAlign.center,
+                    style: cardTitleStyle,
                   ),
-                  SizedBox(height: 16.0),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 32.0),
-                    width: double.infinity,
-                    child: Text(
-                      "TCEA Cartera: ${(tcea * 100).toStringAsFixed(2)}",
-                      textAlign: TextAlign.end,
-                    ),
+                ),
+                Flexible(
+                  child: Text(
+                    "TCEA Cartera: ${(tcea * 100).toStringAsFixed(7)}%",
+                    textAlign: TextAlign.center,
+                    style: cardTitleStyle,
                   ),
-                  SizedBox(height: 16.0),
-                ],
+                ),
+              ],
+            ),
+            SizedBox(height: 32.0),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 32.0),
+              child: ButtonWidget(
+                text: 'Agregar',
+                onPressed: _addBill,
               ),
             ),
-          ),
-          SizedBox(height: 32.0),
-        ],
-      )),
+            SizedBox(height: 32.0),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: Card(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    columns: [
+                      DataColumn(label: Text('N')),
+                      DataColumn(label: Text('Fecha Giro')),
+                      DataColumn(label: Text('Val. Nominal')),
+                      DataColumn(label: Text('Fecha Ven.')),
+                      DataColumn(label: Text('Dias')),
+                      DataColumn(label: Text('Retencion')),
+                      DataColumn(label: Text('TEP (i`)')),
+                      DataColumn(label: Text('d %')),
+                      DataColumn(label: Text('Descuento')),
+                      DataColumn(label: Text('Costes Ini.')),
+                      DataColumn(label: Text('Costes Fin.')),
+                      DataColumn(label: Text('Val. Neto')),
+                      DataColumn(label: Text('Val. Rec.')),
+                      DataColumn(label: Text('Val. Emt.')),
+                      DataColumn(label: Text('TCEA %')),
+                      DataColumn(label: Text('Acciones')),
+                    ],
+                    rows: bills.map((e) {
+                      int index = bills.indexOf(e);
+                      return DataRow(cells: [
+                        DataCell(Text((index + 1).toString())),
+                        DataCell(Text(getDateText(e.turnDate))),
+                        DataCell(Text(e.nominalValue.toStringAsFixed(2))),
+                        DataCell(Text(getDateText(e.dueDate))),
+                        DataCell(Text(e.days.toString())),
+                        DataCell(Text(e.retention.toStringAsFixed(2))),
+                        DataCell(Text(
+                            "${(e.interestRate * 100).toStringAsFixed(7)}%")),
+                        DataCell(Text(
+                            "${(e.discountRate * 100).toStringAsFixed(7)}%")),
+                        DataCell(Text(e.discount.toStringAsFixed(2))),
+                        DataCell(Text(e.initialTotal.toStringAsFixed(2))),
+                        DataCell(Text(e.finalTotal.toStringAsFixed(2))),
+                        DataCell(Text(e.netWorth.toStringAsFixed(2))),
+                        DataCell(Text(e.valueReceived.toStringAsFixed(2))),
+                        DataCell(Text(e.valueDelivered.toStringAsFixed(2))),
+                        DataCell(Text("${(e.tcea * 100).toStringAsFixed(7)}%")),
+                        DataCell(
+                          IconButton(
+                            icon: Icon(Icons.delete),
+                            onPressed: () => _deleteBill(e),
+                          ),
+                        ),
+                      ]);
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 32.0),
+          ],
+        ),
+      ),
     );
   }
 

@@ -13,7 +13,6 @@ import 'package:itzbill/screens/pool_screen.dart';
 
 import 'package:itzbill/widgets/toast_widget.dart';
 import 'package:itzbill/widgets/loading_widget.dart';
-import 'package:itzbill/widgets/button_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   HomeScreen({Key? key}) : super(key: key);
@@ -59,93 +58,102 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _createPool() async {
-    name = "";
+    try {
+      name = "";
 
-    bool create = await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text('Crear nueva cartera'),
-              content: Container(
-                height: 150,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ListTile(
-                      title: const Text('Soles'),
-                      leading: Radio<String>(
-                        value: "Soles",
-                        groupValue: currency,
-                        onChanged: (String? value) {
-                          setState(() {
-                            currency = value!;
-                          });
-                        },
-                      ),
-                    ),
-                    ListTile(
-                      title: const Text('Dolares'),
-                      leading: Radio<String>(
-                        value: "Dolares",
-                        groupValue: currency,
-                        onChanged: (String? value) {
-                          setState(() {
-                            currency = value!;
-                          });
-                        },
-                      ),
-                    ),
-                    TextField(
-                      keyboardType: TextInputType.numberWithOptions(
-                        decimal: true,
-                        signed: false,
-                      ),
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'Nombre de la cartera',
-                      ),
-                      style: TextStyle(
-                        fontSize: 16.0,
-                        height: 1.0,
-                      ),
-                      onChanged: ((value) => {
+      bool create = await showDialog(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text('Crear nueva cartera'),
+                content: Container(
+                  height: 150,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ListTile(
+                        title: const Text('Soles'),
+                        leading: Radio<String>(
+                          activeColor: Theme.of(context).primaryColor,
+                          value: "Soles",
+                          groupValue: currency,
+                          onChanged: (String? value) {
                             setState(() {
-                              name = value;
-                            })
-                          }),
-                    ),
-                  ],
+                              currency = value!;
+                            });
+                          },
+                        ),
+                      ),
+                      ListTile(
+                        title: const Text('Dolares'),
+                        leading: Radio<String>(
+                          activeColor: Theme.of(context).primaryColor,
+                          value: "Dolares",
+                          groupValue: currency,
+                          onChanged: (String? value) {
+                            setState(() {
+                              currency = value!;
+                            });
+                          },
+                        ),
+                      ),
+                      TextField(
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: false,
+                        ),
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText: 'Nombre de la cartera',
+                        ),
+                        style: TextStyle(
+                          fontSize: 16.0,
+                          height: 1.0,
+                        ),
+                        onChanged: ((value) => {
+                              setState(() {
+                                name = value;
+                              })
+                            }),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: Text("Cancelar"),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: Text("Crear"),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (create) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PoolScreen(
-            currency: currency,
-            name: name,
-          ),
-        ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text("Cancelar"),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: Text("Crear"),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       );
-    }
+
+      if (create) {
+        Pool pool = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PoolScreen(
+              currency: currency,
+              name: name,
+            ),
+          ),
+        );
+        if (pool != null) {
+          setState(() {
+            pools.add(pool);
+          });
+        }
+      }
+    } on Error catch (e) {}
   }
 
   _startLoading() {
@@ -176,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _logout() async {
     if (loading) return;
 
+    fToast.init(context);
     _startLoading();
 
     try {
@@ -207,6 +216,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _deletePool(String poolId) async {
+    _startLoading();
+    try {
+      await _databaseService.deletePool(poolId);
+      _stopLoading();
+      _showToast('Eliminado con exito');
+      Navigator.of(context).pop(true);
+    } on Error catch (e) {
+      print(e.toString());
+      _stopLoading();
+      _showToast('Error al eliminar, intente nuevamente', true);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -227,144 +250,221 @@ class _HomeScreenState extends State<HomeScreen> {
     Color color = Theme.of(context).primaryColor;
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 80.0,
-        //title: LogoWidget(fontSize: 48, alternative: true),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: Text(
+          'Cartera de Letras de Cambio',
+          style: TextStyle(color: Theme.of(context).primaryColor),
+        ),
         actions: [
           IconButton(
             icon: Icon(Icons.logout),
-            color: Theme.of(context).colorScheme.onSecondary,
             onPressed: _logout,
           ),
         ],
       ),
-      body: Padding(
-        padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 64.0),
-        child: Column(
-          children: [
-            ...pools.map((e) {
-              return Padding(
-                padding: EdgeInsets.only(bottom: 32.0),
-                child: InkWell(
-                  onTap: () => _loadPool(e),
-                  child: Card(
-                    child: Container(
-                      height: 325,
-                      width: double.infinity,
-                      child: Column(
-                        children: [
-                          ListTile(
-                            title: Text(
-                              e.name == "" ? "Cartera de Letra" : e.name,
-                              style: TextStyle(
-                                fontSize: 22.0,
-                              ),
+      floatingActionButton: SizedBox(
+        height: 100.0,
+        width: 100.0,
+        child: FittedBox(
+          child: FloatingActionButton(
+            backgroundColor: Theme.of(context).primaryColor,
+            child: Icon(Icons.add),
+            onPressed: _createPool,
+          ),
+        ),
+      ),
+      body: pools.length > 0
+          ? ListView.builder(
+              itemCount: pools.length,
+              itemBuilder: (context, index) {
+                final e = pools[index];
+                return Dismissible(
+                  key: Key(e.id),
+                  direction: DismissDirection.endToStart,
+                  confirmDismiss: (DismissDirection direction) async {
+                    return await showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: const Text("Eliminar cartera"),
+                          content: const Text(
+                              "¿Estas seguro que deseas eliminar esta cartera?"),
+                          actions: <Widget>[
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text("Cancelar"),
                             ),
-                            // subtitle: Text('Tasa ${e.rate.type}'),
-                          ),
-                          Divider(
-                            height: 1.0,
-                            color:
-                                Theme.of(context).primaryColor.withOpacity(0.3),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            TextButton(
+                                onPressed: () => _deletePool(e.id),
+                                child: const Text("Eliminar")),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  onDismissed: (direction) async {
+                    setState(() {
+                      pools.removeAt(index);
+                    });
+                  },
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: EdgeInsets.only(right: 480.0),
+                    child: Icon(Icons.delete, size: 100),
+                  ),
+                  child: Padding(
+                    padding:
+                        EdgeInsets.only(bottom: 32.0, left: 64.0, right: 64.0),
+                    child: InkWell(
+                      onTap: () => _loadPool(e),
+                      child: Card(
+                        child: Container(
+                          height: 325,
+                          width: double.infinity,
+                          child: Column(
                             children: [
-                              Flexible(
-                                child: Column(
-                                  children: [
-                                    ListTile(
-                                      leading: Icon(
-                                        Icons.calendar_today,
-                                        color: color,
-                                      ),
-                                      title:
-                                          Text(e.rate.daysPerYear.toString()),
-                                      subtitle: Text('Dias por año'),
-                                    ),
-                                    ListTile(
-                                      leading: Text(
-                                        '%',
-                                        style: TextStyle(
-                                          fontSize: 20.0,
-                                          color: color,
-                                        ),
-                                      ),
-                                      title: Text(
-                                          '${(e.rate.value * 100).toStringAsFixed(7)} %'),
-                                      subtitle: Text('Tasa ${e.rate.type}'),
-                                    ),
-                                    ListTile(
-                                      leading: Icon(
-                                        Icons.date_range,
-                                        color: color,
-                                      ),
-                                      title: Text(
-                                          '${rateMap.keys.firstWhere((k) => rateMap[k] == e.rate.termDays)} (${e.rate.termDays} dia${e.rate.termDays > 1 ? 's' : ''})'),
-                                      subtitle: Text('Plazo de Tasa'),
-                                    ),
-                                    _buildCapitalizationDays(e.rate),
-                                  ],
+                              ListTile(
+                                title: Text(
+                                  e.name == "" ? "Cartera de Letra" : e.name,
+                                  style: TextStyle(
+                                    fontSize: 22.0,
+                                  ),
                                 ),
+                                // subtitle: Text('Tasa ${e.rate.type}'),
                               ),
-                              Flexible(
-                                child: Column(
-                                  children: [
-                                    ListTile(
-                                      leading: Icon(
-                                        Icons.attach_money,
-                                        color: color,
-                                      ),
-                                      title: Text(e.currency),
-                                      subtitle: Text('Moneda'),
-                                    ),
-                                    ListTile(
-                                      leading: Icon(
-                                        Icons.money,
-                                        color: color,
-                                      ),
-                                      title: Text(
-                                          e.receivedTotal.toStringAsFixed(2)),
-                                      subtitle: Text('Valor Total a Recibir'),
-                                    ),
-                                    ListTile(
-                                      leading: Icon(
-                                        Icons.today,
-                                        color: color,
-                                      ),
-                                      title: Text(
-                                          '${e.discountDate.day}/${e.discountDate.month}/${e.discountDate.year}'),
-                                      subtitle: Text('Fecha de Descuento'),
-                                    ),
-                                    ListTile(
-                                      leading: Text(
-                                        "TCEA",
-                                        style: TextStyle(
-                                          color: color,
+                              Divider(
+                                height: 1.0,
+                                color: Theme.of(context)
+                                    .primaryColor
+                                    .withOpacity(0.3),
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Flexible(
+                                    child: Column(
+                                      children: [
+                                        ListTile(
+                                          leading: Icon(
+                                            Icons.calendar_today,
+                                            color: color,
+                                          ),
+                                          title: Text(
+                                              e.rate.daysPerYear.toString()),
+                                          subtitle: Text('Dias por año'),
                                         ),
-                                      ),
-                                      title: Text(
-                                          '${(e.tcea * 100).toStringAsFixed(7)} %'),
-                                      subtitle:
-                                          Text('Tasa de Coste Efectiva Anual'),
+                                        ListTile(
+                                          leading: Text(
+                                            '%',
+                                            style: TextStyle(
+                                              fontSize: 20.0,
+                                              color: color,
+                                            ),
+                                          ),
+                                          title: Text(
+                                              '${(e.rate.value * 100).toStringAsFixed(7)} %'),
+                                          subtitle: Text('Tasa ${e.rate.type}'),
+                                        ),
+                                        ListTile(
+                                          leading: Icon(
+                                            Icons.date_range,
+                                            color: color,
+                                          ),
+                                          title: Text(
+                                              '${rateMap.keys.firstWhere((k) => rateMap[k] == e.rate.termDays)} (${e.rate.termDays} dia${e.rate.termDays > 1 ? 's' : ''})'),
+                                          subtitle: Text('Plazo de Tasa'),
+                                        ),
+                                        _buildCapitalizationDays(e.rate),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  Flexible(
+                                    child: Column(
+                                      children: [
+                                        ListTile(
+                                          leading: Icon(
+                                            Icons.attach_money,
+                                            color: color,
+                                          ),
+                                          title: Text(e.currency),
+                                          subtitle: Text('Moneda'),
+                                        ),
+                                        ListTile(
+                                          leading: Icon(
+                                            Icons.money,
+                                            color: color,
+                                          ),
+                                          title: Text(e.receivedTotal
+                                              .toStringAsFixed(2)),
+                                          subtitle:
+                                              Text('Valor Total a Recibir'),
+                                        ),
+                                        ListTile(
+                                          leading: Icon(
+                                            Icons.today,
+                                            color: color,
+                                          ),
+                                          title: Text(
+                                              '${e.discountDate.day}/${e.discountDate.month}/${e.discountDate.year}'),
+                                          subtitle: Text('Fecha de Descuento'),
+                                        ),
+                                        ListTile(
+                                          leading: Text(
+                                            "TCEA",
+                                            style: TextStyle(
+                                              color: color,
+                                            ),
+                                          ),
+                                          title: Text(
+                                              '${(e.tcea * 100).toStringAsFixed(7)} %'),
+                                          subtitle: Text(
+                                              'Tasa de Coste Efectiva Anual'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            }).toList(),
-            ButtonWidget(text: 'Crear nueva cartera', onPressed: _createPool),
-          ],
-        ),
-      ),
+                );
+              },
+            )
+          : Container(
+              width: double.infinity,
+              height: double.infinity,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/noresult.png',
+                    scale: 2,
+                  ),
+                  SizedBox(height: 32.0),
+                  Text(
+                    'Cartera de Letras de Cambio vacia',
+                    style: TextStyle(
+                      color: Theme.of(context).primaryColor,
+                      fontSize: 28.0,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 16.0),
+                  Text(
+                    "Crea una tocando el botón de círculo '+' de abajo.",
+                    style: TextStyle(
+                      fontSize: 20.0,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -377,7 +477,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             title: Text(
                 '${rateMap.keys.firstWhere((k) => rateMap[k] == rate.capitalizationDays)} (${rate.capitalizationDays} dia${rate.capitalizationDays > 1 ? 's' : ''})'),
-            subtitle: Text('Plazo de Tasa'),
+            subtitle: Text('Periodo de Capitalizacion'),
           )
         : SizedBox(height: 0.0);
   }

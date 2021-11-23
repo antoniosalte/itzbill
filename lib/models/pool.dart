@@ -5,6 +5,7 @@ class Pool {
   String id;
   String userId;
   String name;
+  DateTime createdAt;
   DateTime discountDate;
   Rate rate;
   Rate tea;
@@ -18,6 +19,7 @@ class Pool {
     required this.id,
     required this.userId,
     required this.name,
+    required this.createdAt,
     required this.discountDate,
     required this.rate,
     required this.tea,
@@ -44,6 +46,7 @@ class Pool {
       id: id,
       userId: userId,
       name: name,
+      createdAt: DateTime.now(),
       discountDate: discountDate,
       rate: rate,
       tea: tea,
@@ -59,6 +62,7 @@ class Pool {
     String id,
     String userId,
     String name,
+    DateTime createdAt,
     DateTime discountDate,
     Rate rate,
     Rate tea,
@@ -72,6 +76,7 @@ class Pool {
       id: id,
       userId: userId,
       name: name,
+      createdAt: createdAt,
       discountDate: discountDate,
       rate: rate,
       tea: tea,
@@ -98,6 +103,7 @@ class Pool {
       'id': id,
       'userId': userId,
       'name': name,
+      'createdAt': createdAt,
       'discountDate': discountDate,
       'rate': rate.toFirestore(),
       'tea': tea.toFirestore(),

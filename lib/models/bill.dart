@@ -6,6 +6,7 @@ class Bill {
   String id;
   String poolId;
   String userId;
+  DateTime createdAt;
   DateTime turnDate;
   DateTime dueDate;
   int days;
@@ -25,6 +26,7 @@ class Bill {
     required this.id,
     required this.poolId,
     required this.userId,
+    required this.createdAt,
     required this.turnDate,
     required this.dueDate,
     required this.days,
@@ -97,6 +99,7 @@ class Bill {
       id: id,
       poolId: poolId,
       userId: userId,
+      createdAt: DateTime.now(),
       turnDate: turnDate,
       dueDate: dueDate,
       days: days,
@@ -121,6 +124,7 @@ class Bill {
       id: map['id'],
       poolId: map['poolId'],
       userId: map['userId'],
+      createdAt: map['createdAt'].toDate(),
       turnDate: map['turnDate'].toDate(),
       dueDate: map['dueDate'].toDate(),
       days: map['days'],
@@ -143,6 +147,7 @@ class Bill {
       'id': id,
       'poolId': poolId,
       'userId': userId,
+      'createdAt': createdAt,
       'turnDate': turnDate,
       'dueDate': dueDate,
       'days': days,

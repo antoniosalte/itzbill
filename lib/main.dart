@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:itzbill/models/pool.dart';
 import 'package:itzbill/screens/pool_screen.dart';
@@ -26,6 +28,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'itzbill',
+        scrollBehavior: CustomScrollBehavior(),
         theme: MainTheme().theme,
         home: FutureBuilder(
           future: _initialization,
@@ -55,7 +58,6 @@ class AuthManager extends StatelessWidget {
         Provider.of<AuthProvider>(context, listen: true);
 
     if (authProvider.isAuthenticated) {
-      //return PoolScreen(currency: "Soles");
       return HomeScreen();
     } else {
       return AuthScreen();
@@ -83,4 +85,12 @@ class SomethingWentWrong extends StatelessWidget {
       child: Text('Error'),
     ));
   }
+}
+
+class CustomScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+      };
 }
