@@ -108,6 +108,7 @@ class Pool {
       'rate': rate.toFirestore(),
       'tea': tea.toFirestore(),
       'tcea': tcea,
+      'receivedTotal': receivedTotal,
       'currency': currency,
       'initialExpenses': initialExpensesMap,
       'finalExpenses': finalExpensesMap,

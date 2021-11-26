@@ -7,6 +7,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 
 import 'package:itzbill/providers/auth_provider.dart';
 import 'package:itzbill/services/database_service.dart';
+import 'package:itzbill/services/decimal_service.dart';
 import 'package:itzbill/models/pool.dart';
 import 'package:itzbill/models/expense.dart';
 import 'package:itzbill/models/bill.dart';
@@ -126,8 +127,6 @@ class PoolScreenState extends State<PoolScreen> {
 
   List<String> valueTypes = ["En Efectivo", "En Porcentaje"];
 
-  final _amountValidator = RegExp('^\$|^(0|([1-9][0-9]{0,}))(\\.[0-9]{0,})?\$');
-
   String getDateText(DateTime? date) {
     if (date == null) {
       return 'Selecciona una fecha';
@@ -246,10 +245,12 @@ class PoolScreenState extends State<PoolScreen> {
       valueReceivedTotal += bill.valueReceived;
     }
     bills = loadedBills;
+
+    double tceaValue = _calculateXIRR();
     setState(() {
       locked = true;
+      tcea = tceaValue;
     });
-    _calculateXIRR();
   }
 
   Future<void> _addBill() async {
@@ -336,16 +337,28 @@ class PoolScreenState extends State<PoolScreen> {
         pool!.tea,
       );
 
-      setState(() {
-        bills.add(bill);
-        valueReceivedTotal += bill.valueReceived;
-      });
+      bills.add(bill);
+      valueReceivedTotal += bill.valueReceived;
 
-      _calculateXIRR();
-      await _databaseService.updatePool(pool!.id, tcea, valueReceivedTotal);
+      double tceaValue = _calculateXIRR();
+      if (tceaValue == -1) {
+        await _databaseService.deletePool(pool!.id);
+        bills.remove(bill);
+        valueReceivedTotal -= bill.valueReceived;
+        locked = false;
+        pool = null;
+        _stopLoading();
+        _showToast('Tasa invalida', true);
+      } else {
+        tcea = tceaValue;
+        pool!.tcea = tcea.toDouble();
+        pool!.receivedTotal = valueReceivedTotal;
+        await _databaseService.updatePool(pool!.id, tcea, valueReceivedTotal);
+        _stopLoading();
+        _showToast('Letra agregada con éxito');
+      }
 
-      _stopLoading();
-      _showToast('Letra agregada con éxito');
+      setState(() {});
     } on Error catch (e) {
       _stopLoading();
       _showToast('Error al agregar: $e', true);
@@ -363,9 +376,13 @@ class PoolScreenState extends State<PoolScreen> {
         valueReceivedTotal -= bill.valueReceived;
         bills.remove(bill);
       });
-
-      _calculateXIRR();
+      double tceaValue = _calculateXIRR();
+      tcea = tceaValue;
+      pool!.tcea = tcea.toDouble();
+      pool!.receivedTotal = valueReceivedTotal;
       await _databaseService.updatePool(pool!.id, tcea, valueReceivedTotal);
+
+      setState(() {});
 
       _stopLoading();
       _showToast("Eliminado con exito");
@@ -375,7 +392,7 @@ class PoolScreenState extends State<PoolScreen> {
     }
   }
 
-  void _calculateXIRR() {
+  double _calculateXIRR() {
     if (bills.length >= 1) {
       js.JsArray dates = new js.JsArray();
       js.JsArray amounts = new js.JsArray();
@@ -396,13 +413,9 @@ class PoolScreenState extends State<PoolScreen> {
 
       js.context.callMethod('alertMessage', [dates, amounts]);
       var state = js.JsObject.fromBrowserObject(js.context['state']);
-      setState(() {
-        tcea = state['xirr'];
-      });
+      return state['xirr'];
     } else {
-      setState(() {
-        tcea = 0.0;
-      });
+      return 0.0;
     }
   }
 
@@ -440,15 +453,11 @@ class PoolScreenState extends State<PoolScreen> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new),
           onPressed: () {
-            pool!.tcea = tcea;
-            pool!.receivedTotal = valueReceivedTotal;
             Navigator.of(context).pop(pool);
           },
         ),
         title: Text(
-          name != ""
-              ? '${name} (Letra de Cambio a Tasa $rateType)'
-              : 'Letra de Cambio a Tasa $rateType',
+          '${name} (Letra de Cambio a Tasa $rateType)',
           style: TextStyle(color: Theme.of(context).primaryColor),
         ),
       ),
@@ -669,14 +678,16 @@ class PoolScreenState extends State<PoolScreen> {
                                               keyboardType: TextInputType
                                                   .numberWithOptions(
                                                 decimal: true,
-                                                signed: false,
                                               ),
                                               decoration: InputDecoration(
                                                 border: OutlineInputBorder(),
                                               ),
                                               inputFormatters: [
-                                                FilteringTextInputFormatter
-                                                    .allow(_amountValidator),
+                                                DecimalTextInputFormatter(
+                                                  decimalRange: 7,
+                                                  activatedNegativeValues:
+                                                      false,
+                                                )
                                               ],
                                               style: TextStyle(
                                                 fontSize: 16.0,
@@ -850,14 +861,15 @@ class PoolScreenState extends State<PoolScreen> {
                                         keyboardType:
                                             TextInputType.numberWithOptions(
                                           decimal: true,
-                                          signed: false,
                                         ),
                                         decoration: InputDecoration(
                                           border: OutlineInputBorder(),
                                         ),
                                         inputFormatters: [
-                                          FilteringTextInputFormatter.allow(
-                                              _amountValidator),
+                                          DecimalTextInputFormatter(
+                                            decimalRange: 2,
+                                            activatedNegativeValues: false,
+                                          )
                                         ],
                                         style: TextStyle(
                                           fontSize: 16.0,
@@ -885,14 +897,15 @@ class PoolScreenState extends State<PoolScreen> {
                                         keyboardType:
                                             TextInputType.numberWithOptions(
                                           decimal: true,
-                                          signed: false,
                                         ),
                                         decoration: InputDecoration(
                                           border: OutlineInputBorder(),
                                         ),
                                         inputFormatters: [
-                                          FilteringTextInputFormatter.allow(
-                                              _amountValidator),
+                                          DecimalTextInputFormatter(
+                                            decimalRange: 2,
+                                            activatedNegativeValues: false,
+                                          )
                                         ],
                                         style: TextStyle(
                                           fontSize: 16.0,
@@ -1046,16 +1059,17 @@ class PoolScreenState extends State<PoolScreen> {
                                                     keyboardType: TextInputType
                                                         .numberWithOptions(
                                                       decimal: true,
-                                                      signed: false,
                                                     ),
                                                     decoration: InputDecoration(
                                                       border:
                                                           OutlineInputBorder(),
                                                     ),
                                                     inputFormatters: [
-                                                      FilteringTextInputFormatter
-                                                          .allow(
-                                                              _amountValidator),
+                                                      DecimalTextInputFormatter(
+                                                        decimalRange: 2,
+                                                        activatedNegativeValues:
+                                                            false,
+                                                      ),
                                                     ],
                                                     style: TextStyle(
                                                       fontSize: 16.0,
@@ -1143,10 +1157,10 @@ class PoolScreenState extends State<PoolScreen> {
                                     ],
                                     rows: initialExpenses.map((e) {
                                       int index = initialExpenses.indexOf(e);
-                                      String value =
-                                          e.valueType == "En Efectivo"
-                                              ? "${e.value}"
-                                              : "${e.value * 100} %";
+                                      String value = e.valueType ==
+                                              "En Efectivo"
+                                          ? "${e.value}"
+                                          : "${(e.value * 100).toStringAsFixed(2)} %";
                                       return DataRow(cells: [
                                         DataCell(Text((index + 1).toString())),
                                         DataCell(Text(e.reason)),
@@ -1306,16 +1320,17 @@ class PoolScreenState extends State<PoolScreen> {
                                                     keyboardType: TextInputType
                                                         .numberWithOptions(
                                                       decimal: true,
-                                                      signed: false,
                                                     ),
                                                     decoration: InputDecoration(
                                                       border:
                                                           OutlineInputBorder(),
                                                     ),
                                                     inputFormatters: [
-                                                      FilteringTextInputFormatter
-                                                          .allow(
-                                                              _amountValidator),
+                                                      DecimalTextInputFormatter(
+                                                        decimalRange: 2,
+                                                        activatedNegativeValues:
+                                                            false,
+                                                      )
                                                     ],
                                                     style: TextStyle(
                                                       fontSize: 16.0,

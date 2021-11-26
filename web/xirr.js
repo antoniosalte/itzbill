@@ -185,18 +185,25 @@ function xirr(transactions, options) {
 }
 
 function alertMessage(dates, amounts) {
-    dateForXirr = [];
-    for (var i = 0; i < dates.length; i++)
-    {
-        dateStringSplit = dates[i].split('/');
-        date = new Date(dateStringSplit[0], dateStringSplit[1], dateStringSplit[2]);
-        amount = parseFloat(amounts[i]);
-        e =  {'amount': amount, 'when': date};
-        dateForXirr.push(e);
-    }
-    rate = xirr(dateForXirr);
-    window.state = {
-        xirr: rate
+    try {
+        dateForXirr = [];
+        for (var i = 0; i < dates.length; i++)
+        {
+            dateStringSplit = dates[i].split('/');
+            date = new Date(dateStringSplit[0], dateStringSplit[1], dateStringSplit[2]);
+            amount = parseFloat(amounts[i]);
+            e =  {'amount': amount, 'when': date};
+            dateForXirr.push(e);
+        }
+        rate = xirr(dateForXirr);
+        window.state = {
+            xirr: rate
+        }
+    } catch (error) {
+        console.error(error);
+        window.state = {
+         xirr: -1
+        }
     }
 }
 

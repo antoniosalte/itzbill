@@ -30,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String currency = "Soles";
   String name = "";
+  String userRuc = "";
+  String userName = "";
 
   Map<String, int> rateMap = {
     "Anual": 360,
@@ -43,6 +45,16 @@ class _HomeScreenState extends State<HomeScreen> {
   };
 
   List<Pool> pools = [];
+
+  Future<void> loadUser() async {
+    if (auth!.isRegister) {
+      await auth!.updateDisplayName();
+    }
+    List<String> displayName = auth!.displayName.split('/');
+    userRuc = displayName[0];
+    userName = displayName[1];
+    setState(() {});
+  }
 
   void _loadPool(Pool pool) async {
     Navigator.push(
@@ -143,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
           MaterialPageRoute(
             builder: (context) => PoolScreen(
               currency: currency,
-              name: name,
+              name: name == "" ? "Cartera de Letras" : name,
             ),
           ),
         );
@@ -236,6 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
     loading = true;
     auth = Provider.of<AuthProvider>(context, listen: false);
     fToast.init(context);
+    loadUser();
     loadPools();
   }
 
@@ -255,6 +268,17 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(color: Theme.of(context).primaryColor),
         ),
         actions: [
+          Padding(
+            padding: EdgeInsets.only(top: 16.0, right: 24.0),
+            child: Text(
+              '$userName ($userRuc)',
+              style: TextStyle(
+                fontSize: 20.0,
+                color: Theme.of(context).primaryColor,
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
           IconButton(
             icon: Icon(Icons.logout),
             onPressed: _logout,
@@ -324,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               ListTile(
                                 title: Text(
-                                  e.name == "" ? "Cartera de Letra" : e.name,
+                                  e.name,
                                   style: TextStyle(
                                     fontSize: 22.0,
                                   ),

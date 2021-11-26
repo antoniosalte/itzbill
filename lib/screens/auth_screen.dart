@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:email_validator/email_validator.dart';
@@ -27,9 +28,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
   FToast fToast = FToast();
 
-  String? name;
   String? email;
   String? password;
+  String? ruc;
+  String? name;
 
   bool obscureText = true;
   bool loading = false;
@@ -91,7 +93,7 @@ class _AuthScreenState extends State<AuthScreen> {
         _stopLoading();
         _showToast("Login successful");
       } else if (formType == FormType.Register) {
-        await auth.registerUser(email!, password!);
+        await auth.registerUser(email!, password!, ruc!, name!);
         _stopLoading();
         _showToast("Successful registration");
       }
@@ -173,7 +175,6 @@ class _AuthScreenState extends State<AuthScreen> {
   List<Widget> buildInputs() {
     if (formType == FormType.Login) {
       return [
-        //TitleWidget(title: 'Login'),
         SizedBox(height: 24.0),
         TextFormField(
           keyboardType: TextInputType.emailAddress,
@@ -202,7 +203,6 @@ class _AuthScreenState extends State<AuthScreen> {
       ];
     } else {
       return [
-        //TitleWidget(title: 'Register'),
         SizedBox(height: 24.0),
         TextFormField(
           keyboardType: TextInputType.emailAddress,
@@ -227,6 +227,27 @@ class _AuthScreenState extends State<AuthScreen> {
           validator: (value) => value!.isEmpty ? strings.passwordError : null,
           onSaved: (value) => password = value,
           obscureText: obscureText,
+        ),
+        SizedBox(height: 24.0),
+        TextFormField(
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(labelText: strings.ruc),
+          validator: (value) => value!.isEmpty
+              ? strings.rucError
+              : value.substring(0, 2) != "20"
+                  ? strings.rucErrorStart
+                  : value.length == 11
+                      ? null
+                      : strings.rucErrorLength,
+          onSaved: (value) => ruc = value,
+        ),
+        SizedBox(height: 24.0),
+        TextFormField(
+          keyboardType: TextInputType.name,
+          decoration: InputDecoration(labelText: strings.name),
+          validator: (value) => value!.isEmpty ? strings.nameError : null,
+          onSaved: (value) => name = value,
         ),
       ];
     }
