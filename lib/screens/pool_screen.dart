@@ -55,6 +55,8 @@ class PoolScreenState extends State<PoolScreen> {
   String? retentionValue;
 
   TextEditingController rateValueController = TextEditingController();
+  TextEditingController nominalValueController = TextEditingController();
+  TextEditingController retentionValueController = TextEditingController();
 
   int rateTermDays = 360;
   int rateCapitalizationDays = 1;
@@ -354,6 +356,12 @@ class PoolScreenState extends State<PoolScreen> {
         pool!.tcea = tcea.toDouble();
         pool!.receivedTotal = valueReceivedTotal;
         await _databaseService.updatePool(pool!.id, tcea, valueReceivedTotal);
+
+        nominalValueController.text = "";
+        retentionValueController.text = "";
+        turnDate = null;
+        dueDate = null;
+
         _stopLoading();
         _showToast('Letra agregada con éxito');
       }
@@ -858,6 +866,7 @@ class PoolScreenState extends State<PoolScreen> {
                                     LabelWidget(label: 'Valor Nominal'),
                                     Flexible(
                                       child: TextField(
+                                        controller: nominalValueController,
                                         keyboardType:
                                             TextInputType.numberWithOptions(
                                           decimal: true,
@@ -894,6 +903,7 @@ class PoolScreenState extends State<PoolScreen> {
                                     LabelWidget(label: 'Retencion'),
                                     Flexible(
                                       child: TextField(
+                                        controller: retentionValueController,
                                         keyboardType:
                                             TextInputType.numberWithOptions(
                                           decimal: true,
